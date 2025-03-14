@@ -1,0 +1,19 @@
+services:
+
+  hub:
+    build: ./
+    container_name: hub
+    volumes:
+      - peers:/app/peers
+      - ./authorized_users.txt:/app/authorized_users.txt:ro
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - 51820:51820
+      - 11434:11434
+    environment:
+      - HUB_PRIV_KEY=${HUB_PRIV_KEY}
+      - DEFAULT_PEER_PUB_KEY=${DEFAULT_PEER_PUB_KEY}
+
+volumes:
+  peers:

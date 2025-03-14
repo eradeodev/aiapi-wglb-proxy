@@ -1,0 +1,12 @@
+[Interface]
+PrivateKey = #HUBPRIVKEY#
+Address = 10.123.123.1/32
+ListenPort = 51820
+
+# DEFAULT PEER USED FOR AUTOMATIC SETUP
+[Peer]
+PublicKey = #DEFAULTPEERPUBKEY#
+AllowedIPs = 10.123.123.2/32
+PersistentKeepalive = 25
+
+## The below section will be automatically set up by spokes

@@ -1,0 +1,25 @@
+services:
+  spoke1:
+    image: wg-spoke:latest
+    container_name: spoke1
+    volumes:
+      - configs:/app/wg-configs
+      - ollama:/root/.ollama
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - HUB_ENDPOINT=
+      - HUB_PUB_KEY=
+      - DEFAULT_PEER_PRIV_KEY=
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_KEEP_ALIVE=24h
+    deploy:
+          resources:
+            reservations:
+              devices:
+              - driver: nvidia
+                capabilities: ["gpu"]
+                count: all
+volumes:
+  configs:
+  ollama:

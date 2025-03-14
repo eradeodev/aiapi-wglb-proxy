@@ -1,0 +1,58 @@
+services:
+
+  hub:
+    build: ./hub
+    container_name: hub
+    volumes:
+      - peers:/app/peers
+      - ./authorized_users.txt:/app/authorized_users.txt:ro
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - 51820:51820
+      - 11434:11434
+    environment:
+      - HUB_PRIV_KEY=${HUB_PRIV_KEY}
+      - DEFAULT_PEER_PUB_KEY=${DEFAULT_PEER_PUB_KEY}
+
+
+  spoke1:
+    build: ./spoke
+    container_name: spoke1
+    volumes:
+      - configs:/app/wg-configs
+      - ollama:/root/.ollama
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - HUB_ENDPOINT=${HUB_ENDPOINT}
+      - HUB_PUB_KEY=${HUB_PUB_KEY}
+      - DEFAULT_PEER_PRIV_KEY=${DEFAULT_PEER_PRIV_KEY}
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_KEEP_ALIVE=24h
+    restart: always
+
+  spoke2:
+    build: ./spoke
+    container_name: spoke2
+    volumes:
+      - configs2:/app/wg-configs
+      - ollama2:/root/.ollama
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - HUB_ENDPOINT=${HUB_ENDPOINT}
+      - HUB_PUB_KEY=${HUB_PUB_KEY}
+      - DEFAULT_PEER_PRIV_KEY=${DEFAULT_PEER_PRIV_KEY}
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_KEEP_ALIVE=24h
+    restart: always
+
+volumes:
+  peers:
+
+  configs:
+  ollama:
+
+  configs2:
+  ollama2:
