@@ -6,7 +6,7 @@ services:
     volumes:
       - peers:/app/peers
       - ./authorized_users.txt:/app/authorized_users.txt:ro
-      - ./wg_inactive_peers.log:/app/wg_inactive_peers.log:rw
+      - ./wg_inactive_peers.txt:/app/wg_inactive_peers.txt
     cap_add:
       - NET_ADMIN
     ports:
