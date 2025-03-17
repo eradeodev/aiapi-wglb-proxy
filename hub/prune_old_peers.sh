@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define file for tracking inactive peers
-INACTIVE_PEERS_FILE="/app/wg_inactive_peers.log"
+INACTIVE_PEERS_FILE="/app/wg_inactive_peers.txt"
 DAYS_TO_KEEP=7
 CURRENT_DATE=$(date +%Y-%m-%d)
 
@@ -55,4 +55,4 @@ while IFS= read -r LINE; do
     fi
 done < "$INACTIVE_PEERS_FILE"
 
-mv "$TMP_FILE" "$INACTIVE_PEERS_FILE"
+cat "$TMP_FILE" > "$INACTIVE_PEERS_FILE"
