@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define file for tracking inactive peers
-INACTIVE_PEERS_FILE="./wg_inactive_peers.log"
+INACTIVE_PEERS_FILE="/app/wg_inactive_peers.log"
 DAYS_TO_KEEP=7
 CURRENT_DATE=$(date +%Y-%m-%d)
 
@@ -45,7 +45,7 @@ while IFS= read -r LINE; do
         echo "$LINE" >> "$TMP_FILE"
     else
         echo "Searching for peer file containing public key: $PEER"
-        for FILE in ./peers/*; do
+        for FILE in /app/peers/*; do
             if grep -q "$PEER" "$FILE"; then
                 echo "Deleting file: $FILE (inactive for $AGE days)"
                 rm -f "$FILE"
