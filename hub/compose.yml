@@ -1,12 +1,11 @@
 services:
-
   hub:
     build: ./
     container_name: hub
     volumes:
       - peers:/app/peers
       - ./authorized_users.txt:/app/authorized_users.txt:ro
-      - ./wg_inactive_peers.txt:/app/wg_inactive_peers.txt
+      - logs:/app/logs
     cap_add:
       - NET_ADMIN
     ports:
@@ -18,3 +17,4 @@ services:
 
 volumes:
   peers:
+  logs:
