@@ -1,18 +1,19 @@
 services:
-  spoke1:
-    image: wg-spoke:latest
-    container_name: spoke1
+  spoke:
+    build: ./
+    container_name: spoke
     volumes:
       - configs:/app/wg-configs
       - ollama:/root/.ollama
     cap_add:
       - NET_ADMIN
     environment:
-      - HUB_ENDPOINT=
-      - HUB_PUB_KEY=
-      - DEFAULT_PEER_PRIV_KEY=
+      - HUB_ENDPOINT=${HUB_ENDPOINT}
+      - HUB_PUB_KEY=${HUB_PUB_KEY}
+      - DEFAULT_PEER_PRIV_KEY=${DEFAULT_PEER_PRIV_KEY}
       - OLLAMA_HOST=0.0.0.0
       - OLLAMA_KEEP_ALIVE=24h
+    # Remove the Deploy item for CPU inference
     deploy:
           resources:
             reservations:
