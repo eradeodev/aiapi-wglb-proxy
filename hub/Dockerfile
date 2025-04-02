@@ -9,7 +9,7 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Set up proxy server
-RUN git clone https://github.com/ParisNeo/ollama_proxy_server.git
+RUN git clone https://github.com/Chewt/ollama_proxy_server.git
 WORKDIR ollama_proxy_server
 RUN pip3 install -e .
 
