@@ -9,7 +9,7 @@ services:
     cap_add:
       - NET_ADMIN
     ports:
-      - 51820:51820
+      - 51820:51820/udp
       - 11434:11434
     environment:
       - HUB_PRIV_KEY=${HUB_PRIV_KEY}
