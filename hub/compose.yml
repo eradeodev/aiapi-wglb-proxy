@@ -2,6 +2,7 @@ services:
   hub:
     build: ./
     container_name: hub
+    restart: always
     volumes:
       - peers:/app/peers
       - ./authorized_users.txt:/app/authorized_users.txt:ro

@@ -2,6 +2,7 @@ services:
   spoke:
     build: ./
     container_name: spoke
+    restart: always
     volumes:
       - configs:/app/wg-configs
       - ollama:/root/.ollama
