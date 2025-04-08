@@ -11,8 +11,8 @@ IFS='.' read -r a b c d <<< "$BASE_IP"
 USED_OCTETS=()
 
 # Iterate over files in 'peers' directory and store used octets
-if [ -d "peers" ]; then
-    for file in peers/*; do
+if [ -d "/app/peers" ]; then
+    for file in /app/peers/*; do
         filename=$(basename "$file")
         if [[ "$filename" =~ ^[0-9]+$ ]]; then
             USED_OCTETS+=( $((filename + 2)) )
