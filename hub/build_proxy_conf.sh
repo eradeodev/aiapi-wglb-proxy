@@ -3,7 +3,7 @@
 
 #!/bin/bash
 
-PEERS_DIR="peers"
+PEERS_DIR="/app/peers"
 OUTPUT_FILE="proxy_config.ini"
 PORT=11434
 

@@ -2,7 +2,7 @@
 # Accept incoming connections from default peer to create new peers
 
 # Ensure peers directory exists
-mkdir -p peers
+mkdir -p /app/peers
 
 # Listen for incoming connections
 while true; do
