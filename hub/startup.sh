@@ -32,12 +32,12 @@ CRON_JOB="0 0 * * * $SCRIPT_PATH"
 chmod +x "$SCRIPT_PATH"
 
 # Check if the cron job already exists
-(crontab -l 2>/dev/null | grep -F "$SCRIPT_PATH") && echo "Cron job already exists." && exit 0
-
-# Add the cron job
-(crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
-
-echo "Cron job added: $CRON_JOB"
+if (crontab -l 2>/dev/null | grep -F "$SCRIPT_PATH") ; then
+    echo "Cron job already exists."
+else
+    (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+    echo "Cron job added: $CRON_JOB"
+fi
 
 
 # Start load balancer
