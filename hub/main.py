@@ -20,12 +20,13 @@ import datetime
 import socket
 import threading
 import sys
+import time
 
 def get_servers_from_config(filename):
     config = configparser.ConfigParser()
     config.read(filename)
     return [
-        (name, {"url": config[name]["url"], "queue": Queue()})
+            (name, {"url": config[name]["url"], "queue": Queue(), "last_processed_time": 0})
         for name in config.sections()
     ]
 
@@ -34,6 +35,13 @@ def get_servers_from_config(filename):
 
 threadlock = threading.Lock()
 servers = []
+
+def update_server_process_time(server_name):
+    with threadlock:
+        global servers
+        for name, data in servers:
+            if name == server_name:
+                data['last_processed_time'] = time.time()
 
 def update_servers_from_config(filename):
     with threadlock:
@@ -55,7 +63,7 @@ def update_servers_from_config(filename):
                     updated_servers.append((name, old_data))
                 else:
                     # URL changed, keep old queue but update URL
-                    updated_servers.append((name, {"url": new_data["url"], "queue": old_data["queue"]}))
+                    updated_servers.append((name, {"url": new_data["url"], "queue": old_data["queue"], "last_processed_time": old_data["last_processed_time"]}))
             else:
                 # New server, add with new queue
                 updated_servers.append((name, new_data))
@@ -118,7 +126,10 @@ def main():
                     ASCIIColors.yellow(
                         f"Server {server_name} unreachable: {str(e)}"
                     )
-            return sorted(reachable, key=lambda s: s[1]["queue"].qsize())
+            return sorted(
+                    reachable,
+                    key=lambda s: (s[1]["queue"].qsize(), s[1]['last_processed_time'])
+                    )
 
         def _is_server_reachable(self, server_name, server_url):
             """Checks if a server is reachable."""
@@ -301,6 +312,7 @@ def main():
                     server_info = reachable_servers[server_index]
                     server_name, config = server_info
                     tried_servers_this_attempt.append(server_name)
+                    self.active_server_name = server_name
 
                     try:
                         if path in ["/api/generate", "/api/embed", "/api/chat", "/v1/chat/completions"]:
@@ -331,7 +343,7 @@ def main():
                                     stream=post_data_dict.get("stream", False),
                                 )
                                 response.raise_for_status()
-                                self.active_server_name = server_name
+                                update_server_process_time(server_name)
                                 self._send_response(response)
                                 self.add_access_log_entry(
                                     event="gen_done",
@@ -379,7 +391,7 @@ def main():
                                         params=get_params,
                                         data=post_data,
                                     )
-                                    self.active_server_name = server_name
+                                    update_server_process_time(server_name)
                                     self._send_response(response)
                                 except requests.exceptions.RequestException as e:
                                     ASCIIColors.yellow(f"Error pulling from {server_name}: {e}")
