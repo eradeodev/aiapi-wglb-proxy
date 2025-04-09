@@ -401,7 +401,7 @@ def main():
                             finally:
                                 load_tracker.get_nowait()
                         elif path == "/api/pull":
-                            # @Work @HI Increase robustness of api/pull logic as currently if a spoke is down when this goes out it won't get the model -- instead when spokes connect to the hub we should query the models they have, and when a request for a given model comes in it should check if any spokes are missing it and pull it on those spokes, ensuring all eventually pull used models.
+                            # @Work @HI Increase robustness of api/pull logic as currently if a spoke is down when this goes out it won't get the model -- instead when spokes connect to the hub we should query the models they have, and when a request for a given model comes in it should check if any spokes are missing it and pull it on those spokes, ensuring all eventually pull used models. Also pull should run in parallel using concurrent.futures.ThreadPoolExecutor
                             for server_info in reachable_servers:
                                 server_name, config = server_info
                                 try:
