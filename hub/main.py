@@ -237,7 +237,7 @@ def main():
             color_end = "\033[0m" if color_start else ""
 
             # Write colored log
-            sys.stderr.write(f"{color_start}{server_name} - {response_status_code} - {message}{color_end}\n")
+            sys.stderr.write(f"{color_start}{server_name} - Queue Size {self.active_server_queue_size} - {response_status_code} - {message}{color_end}\n")
 
         def log_message(self, format, *args):
             return
@@ -328,6 +328,7 @@ def main():
                     server_name, config = server_info
                     tried_servers_this_attempt.append(server_name)
                     self.active_server_name = server_name
+                    self.active_server_queue_size = config["queue"].qsize()
                     update_server_process_time(server_name)
 
                     try:
