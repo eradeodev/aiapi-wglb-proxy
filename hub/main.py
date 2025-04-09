@@ -137,7 +137,7 @@ def main():
             host = parsed.hostname
             port = parsed.port or (80 if parsed.scheme == "http" else 443)
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.settimeout(3)
+                s.settimeout(10)
                 try:
                     s.connect((host, port))
                     return True
@@ -510,7 +510,7 @@ def main():
             reachable_servers = self.get_reachable_servers()
 
             if not reachable_servers:
-                not_available_message = "No reachable Ollama servers available."
+                not_available_message = f"No reachable Ollama servers available. Reachable Servers: {reachable_servers}, Servers: {servers}"
                 self._send_response_code(503, not_available_message)
                 self.end_headers()
                 ASCIIColors.red(not_available_message)
