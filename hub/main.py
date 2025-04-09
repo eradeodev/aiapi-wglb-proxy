@@ -316,7 +316,7 @@ def main():
             max_retries = 3
             attempt = 0
             tried_servers_overall = []
-
+            proxy_timeout = (60, 1500)  # (connect timeout, read timeout)
             while attempt < max_retries:
                 attempt += 1
                 tried_servers_this_attempt = []
@@ -361,6 +361,7 @@ def main():
                                     params=get_params,
                                     data=post_data,
                                     stream=post_data_dict.get("stream", False),
+                                    timeout=proxy_timeout,
                                 )
                                 response.raise_for_status()
                                 self._send_response(response)
@@ -410,6 +411,7 @@ def main():
                                         config["url"] + path,
                                         params=get_params,
                                         data=post_data,
+                                        timeout=proxy_timeout,
                                     )
                                     self._send_response(response)
                                 except requests.exceptions.RequestException as e:
@@ -431,6 +433,7 @@ def main():
                                 config["url"] + path,
                                 params=get_params,
                                 data=post_data,
+                                timeout=proxy_timeout,
                             )
                             try:
                                 response.raise_for_status()
