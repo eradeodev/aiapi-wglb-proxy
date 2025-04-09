@@ -9,9 +9,9 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Set up proxy server
-RUN git clone https://github.com/Chewt/ollama_proxy_server.git
-WORKDIR ollama_proxy_server
-RUN pip3 install -e .
+COPY requirements.txt .
+COPY main.py .
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Copy everything from the current directory into the container
 COPY accept_new_peers.sh /app

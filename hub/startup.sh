@@ -45,5 +45,5 @@ fi
 while true; do
     echo "Starting load balancer"
     ./build_proxy_conf.sh
-    python3 ./ollama_proxy_server/ollama_proxy_server/main.py --config ./proxy_config.ini --users_list ./authorized_users.txt --port 11434
+    python3 ./main.py --config ./proxy_config.ini --users_list ./authorized_users.txt --port 11434
 done

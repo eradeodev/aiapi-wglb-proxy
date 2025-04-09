@@ -24,9 +24,20 @@ sed -i "s|#HUBPUBLICKEY#|$HUB_PUB_KEY|g" "$FILE"
 sed -i "s|#DEFAULTPEERPRIV#|$DEFAULT_PEER_PRIV_KEY|g" "$FILE"
 
 function create_new_config {
-    # Start default wireguard connection
-    wg-quick up ./initial_config.conf
+    # Start default wireguard connection, retrying the command until it succeeds
+    while true; do
+        # Try to bring up the WireGuard interface
+        wg-quick up ./initial_config.conf
 
+        # Check if the command was successful
+        if [ $? -eq 0 ]; then
+            echo "WireGuard connection established successfully."
+            break
+        else
+            echo "Failed to bring up WireGuard. Retrying in 5 seconds..."
+            sleep 5
+        fi
+    done
     # Wait for connection to Hub
     echo "Waiting for connection to 10.123.123.1 via default config..."
     while ! ping -c 1 -W 1 10.123.123.1 &> /dev/null; do
