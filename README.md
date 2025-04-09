@@ -39,7 +39,7 @@ Spoke respectively:
 Hub
 ```
 HUB_PRIV_KEY: The private key generate for the Hub
-DEFUALT_PEER_PUB_KEY: The public key generated for the Default Peer
+DEFAULT_PEER_PUB_KEY: The public key generated for the Default Peer
 ```
 Spoke
 ```
