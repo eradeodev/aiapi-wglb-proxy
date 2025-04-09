@@ -200,8 +200,8 @@ def main():
                 }
                 writer.writerow(row)
 
-        def _send_response(self, response):
-            self.send_response(response.status_code)
+        def _send_response(self, response, message=""):
+            self.send_response(response.status_code, message)
             for key, value in response.headers.items():
                 if key.lower() not in [
                     "content-length",
