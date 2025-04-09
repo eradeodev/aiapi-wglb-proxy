@@ -313,6 +313,7 @@ def main():
                     server_name, config = server_info
                     tried_servers_this_attempt.append(server_name)
                     self.active_server_name = server_name
+                    update_server_process_time(server_name)
 
                     try:
                         if path in ["/api/generate", "/api/embed", "/api/chat", "/v1/chat/completions"]:
@@ -343,7 +344,6 @@ def main():
                                     stream=post_data_dict.get("stream", False),
                                 )
                                 response.raise_for_status()
-                                update_server_process_time(server_name)
                                 self._send_response(response)
                                 self.add_access_log_entry(
                                     event="gen_done",
@@ -391,7 +391,6 @@ def main():
                                         params=get_params,
                                         data=post_data,
                                     )
-                                    update_server_process_time(server_name)
                                     self._send_response(response)
                                 except requests.exceptions.RequestException as e:
                                     ASCIIColors.yellow(f"Error pulling from {server_name}: {e}")
