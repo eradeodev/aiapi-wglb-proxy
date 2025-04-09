@@ -225,8 +225,11 @@ def main():
                 pass
 
         def custom_log_message(self, response_status_code, message=""):
-            server_name = getattr(self, "active_server_name", "unset server name!")
-            
+            server_name = getattr(self, "active_server_name", "unset_server")
+            if server_name != "unset_server":
+                server_name += f"- Queue Size {self.active_server_queue_size}"
+
+            server_name 
             # Determine color
             if 400 <= response_status_code < 500:
                 color_start = "\033[91m"  # Red
@@ -237,7 +240,7 @@ def main():
             color_end = "\033[0m" if color_start else ""
 
             # Write colored log
-            sys.stderr.write(f"{color_start}{server_name} - Queue Size {self.active_server_queue_size} - {response_status_code} - {message}{color_end}\n")
+            sys.stderr.write(f"{color_start}{server_name} - {response_status_code} - {message}{color_end}\n")
 
         def log_message(self, format, *args):
             return
