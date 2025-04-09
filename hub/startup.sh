@@ -24,6 +24,9 @@ echo "Starting wireguard"
 echo "Accepting new peers"
 ./accept_new_peers.sh &
 
+# Start cron service
+service cron start
+
 # Register peer pruner in cron job
 SCRIPT_PATH="/app/prune_old_peers.sh"
 CRON_JOB="* * * * * $SCRIPT_PATH"
