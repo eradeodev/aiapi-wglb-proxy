@@ -22,7 +22,6 @@ for file in "$PEERS_DIR"/*; do
             fi
             echo "[$SERVER_NAME]" >> "$OUTPUT_FILE"
             echo "url = http://$IP:$PORT" >> "$OUTPUT_FILE"
-            echo "queue_size = 3" >> "$OUTPUT_FILE"
             echo "" >> "$OUTPUT_FILE"
             ((count++))
         fi
