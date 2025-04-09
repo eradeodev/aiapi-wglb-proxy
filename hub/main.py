@@ -200,8 +200,13 @@ def main():
                 }
                 writer.writerow(row)
 
+        def _send_response_code(self, response_code, message=""):
+            self.custom_log_message(response_code, message)
+            self.send_response(response_code, message)
+
+
         def _send_response(self, response, message=""):
-            self.custom_log_message(response, message)
+            self.custom_log_message(response.status_code, message)
             self.send_response(response.status_code, message)
             for key, value in response.headers.items():
                 if key.lower() not in [
@@ -219,10 +224,10 @@ def main():
             except BrokenPipeError:
                 pass
 
-        def custom_log_message(self, response, message=""):
+        def custom_log_message(self, response_status_code, message=""):
             server_name = getattr(self, "active_server_name", "unset server name!")
             # Add the server name to the log
-            sys.stderr.write("%s - %s\n" % (server_name, format % args))
+            sys.stderr.write("%s - %s - %s\n" % (server_name, response_status_code, message))
 
         def log_message(self, format, *args):
             return
@@ -276,7 +281,7 @@ def main():
                         nb_queued_requests_on_server=-1,
                         error="Authentication failed",
                     )
-                    self.send_response(403)
+                    self._send_response_code(403, f"User '{user}' is not authorized")
                     self.end_headers()
                     return False
 
@@ -469,7 +474,7 @@ def main():
             # If all retries failed
             all_tried_servers = list(set(tried_servers_overall))
             retry_failed_message = f"Failed to process the request on any of the reachable servers after {max_retries} retries: {', '.join(all_tried_servers)}"
-            self.send_response(503, retry_failed_message)
+            self._send_response_code(503, retry_failed_message)
             self.end_headers()
             ASCIIColors.red(retry_failed_message)
             self.add_access_log_entry(
@@ -492,7 +497,7 @@ def main():
 
             if not reachable_servers:
                 not_available_message = "No reachable Ollama servers available."
-                self.send_response(503, not_available_message)
+                self._send_response_code(503, not_available_message)
                 self.end_headers()
                 ASCIIColors.red(not_available_message)
                 client_ip, client_port = self.client_address
