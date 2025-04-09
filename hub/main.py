@@ -219,21 +219,18 @@ def main():
                 pass
 
         def log_message(self, format, *args):
-            server_name = getattr(self, "active_server_name", "")
+            server_name = getattr(self, "active_server_name", "unset server name!")
             # Add the server name to the log
             sys.stderr.write("%s - %s\n" % (server_name, format % args))
 
 
         def do_HEAD(self):
-            self.log_request()
             self._handle_request()
 
         def do_GET(self):
-            self.log_request()
             self._handle_request()
 
         def do_POST(self):
-            self.log_request()
             self._handle_request()
 
         def _validate_user(self):
