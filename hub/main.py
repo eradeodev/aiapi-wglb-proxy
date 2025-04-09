@@ -467,10 +467,10 @@ def main():
                 tried_servers_overall.extend(tried_servers_this_attempt)
 
             # If all retries failed
+            all_tried_servers = list(set(tried_servers_overall))
             retry_failed_message = f"Failed to process the request on any of the reachable servers after {max_retries} retries: {', '.join(all_tried_servers)}"
             self.send_response(503, retry_failed_message)
             self.end_headers()
-            all_tried_servers = list(set(tried_servers_overall))
             ASCIIColors.red(retry_failed_message)
             self.add_access_log_entry(
                 event="error",
