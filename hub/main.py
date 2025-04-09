@@ -64,7 +64,6 @@ def main():
         "-d", "--deactivate_security", action="store_true", help="Deactivates security"
     )
     args = parser.parse_args()
-    servers = get_config(args.config)
     authorized_users = get_authorized_users(args.users_list)
     deactivate_security = args.deactivate_security
     ASCIIColors.red("Ollama Proxy server")
@@ -74,6 +73,7 @@ def main():
         def get_reachable_servers(self):
             """Returns list of servers sorted by queue size and filtered by network reachability"""
             reachable = []
+            servers = get_config(args.config)
             for server in servers:
                 server_name, config = server
                 try:
