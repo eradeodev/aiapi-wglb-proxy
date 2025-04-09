@@ -362,7 +362,7 @@ def main():
                                     error=f"HTTP error {e.response.status_code}: {e}",
                                 )
                                 if 400 <= e.response.status_code < 500:
-                                    self._send_response(e.response)
+                                    self._send_response(e.response, f"Generate request handling failed, GET params={get_params}, POST data={post_data}")
                                     return  # Malformed request, no retry
                                 # For 5xx errors, we will retry
                             except requests.exceptions.RequestException as e:
@@ -375,6 +375,7 @@ def main():
                                     nb_queued_requests_on_server=load_tracker.qsize(),
                                     error=str(e),
                                 )
+                                self._send_response(e.response, f"Generate request handling failed, GET params={get_params}, POST data={post_data}")
                             finally:
                                 load_tracker.get_nowait()
                         elif path == "/api/pull":
@@ -400,6 +401,7 @@ def main():
                                         nb_queued_requests_on_server=-1,
                                         error=str(e),
                                     )
+                                    self._send_response(e.response, f"/api/pull request handling failed, GET params={get_params}, POST data={post_data}")
                             return  # Pull request sent to all reachable servers
                         else:
                             response = requests.request(
@@ -423,8 +425,8 @@ def main():
                                     error=f"HTTP error {e.response.status_code}: {e}",
                                 )
                                 if 400 <= e.response.status_code < 500:
-                                    self._send_response(e.response)
-                                    return  # Malformed request, no retry
+                                    self._send_response(e.response, f"General request handling failed, GET params={get_params}, POST data={post_data}")
+                                    return
                                 # For 5xx errors, we will retry
                             except requests.exceptions.RequestException as e:
                                 self.add_access_log_entry(
@@ -462,10 +464,11 @@ def main():
                 tried_servers_overall.extend(tried_servers_this_attempt)
 
             # If all retries failed
-            self.send_response(503)
+            retry_failed_message = f"Failed to process the request on any of the reachable servers after {max_retries} retries: {', '.join(all_tried_servers)}"
+            self.send_response(503, retry_failed_message)
             self.end_headers()
             all_tried_servers = list(set(tried_servers_overall))
-            ASCIIColors.red(f"Failed to process the request on any of the reachable servers after {max_retries} retries: {', '.join(all_tried_servers)}")
+            ASCIIColors.red(retry_failed_message)
             self.add_access_log_entry(
                 event="error",
                 user=self.user,
@@ -485,9 +488,10 @@ def main():
             reachable_servers = self.get_reachable_servers()
 
             if not reachable_servers:
-                self.send_response(503)
+                not_available_message = "No reachable Ollama servers available."
+                self.send_response(503, not_available_message)
                 self.end_headers()
-                ASCIIColors.red("No reachable Ollama servers available.")
+                ASCIIColors.red(not_available_message)
                 client_ip, client_port = self.client_address
                 self.add_access_log_entry(
                     event="error",
