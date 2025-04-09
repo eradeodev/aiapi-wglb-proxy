@@ -10,8 +10,8 @@ WORKDIR /app
 
 # Set up proxy server
 COPY requirements.txt .
-COPY main.py .
 RUN pip3 install --no-cache-dir -r requirements.txt
+COPY main.py .
 
 # Copy everything from the current directory into the container
 COPY accept_new_peers.sh /app
