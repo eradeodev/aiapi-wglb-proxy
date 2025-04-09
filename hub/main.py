@@ -19,6 +19,7 @@ import csv
 import datetime
 import socket
 import threading
+import sys
 
 def get_servers_from_config(filename):
     config = configparser.ConfigParser()
@@ -206,6 +207,12 @@ def main():
             except BrokenPipeError:
                 pass
 
+        def log_message(self, format, *args):
+            server_name = getattr(self, "active_server_name", "")
+            # Add the server name to the log
+            sys.stderr.write("%s - %s\n" % (server_name, format % args))
+
+
         def do_HEAD(self):
             self.log_request()
             self._handle_request()
@@ -324,6 +331,7 @@ def main():
                                     stream=post_data_dict.get("stream", False),
                                 )
                                 response.raise_for_status()
+                                self.active_server_name = server_name
                                 self._send_response(response)
                                 self.add_access_log_entry(
                                     event="gen_done",
@@ -371,6 +379,7 @@ def main():
                                         params=get_params,
                                         data=post_data,
                                     )
+                                    self.active_server_name = server_name
                                     self._send_response(response)
                                 except requests.exceptions.RequestException as e:
                                     ASCIIColors.yellow(f"Error pulling from {server_name}: {e}")
