@@ -1,9 +1,11 @@
 #!/bin/bash
 
 # Define file for tracking inactive peers
+cd /app
 INACTIVE_PEERS_FILE="/app/logs/wg_inactive_peers.txt"
-DAYS_TO_KEEP=7
-CURRENT_DATE=$(date +%Y-%m-%d)
+PEERS_DIR="/app/peers"
+MINS_TO_KEEP=5
+CURRENT_EPOCH=$(date +%s)
 
 # Get list of peers without a handshake
 INACTIVE_PEERS=($(wg show hub-wg peers | while read -r PEER; do
@@ -22,7 +24,7 @@ fi
 # Add new inactive peers with the current date if not already logged
 for PEER in "${INACTIVE_PEERS[@]}"; do
     if ! grep -q "$PEER" "$INACTIVE_PEERS_FILE"; then
-        echo "$PEER $CURRENT_DATE" >> "$INACTIVE_PEERS_FILE"
+        echo "$PEER $CURRENT_EPOCH" >> "$INACTIVE_PEERS_FILE"
     fi
 done
 
@@ -36,23 +38,31 @@ done < "$INACTIVE_PEERS_FILE"
 
 # Delete peers inactive for more than 7 days
 TMP_FILE=$(mktemp)
+PEERS_REMOVED=0
 while IFS= read -r LINE; do
     PEER=$(echo "$LINE" | awk '{print $1}')
     FIRST_SEEN=$(echo "$LINE" | awk '{print $2}')
-    AGE=$(( ( $(date -d "$CURRENT_DATE" +%s) - $(date -d "$FIRST_SEEN" +%s) ) / 86400 ))
-    
-    if [ "$AGE" -lt "$DAYS_TO_KEEP" ]; then
+    AGE=$(( ( $CURRENT_EPOCH - $FIRST_SEEN ) / 60 )) # 60 seconds per minutes
+    echo "$PEER inactive for $AGE minutes"
+    if [ "$AGE" -lt "$MINS_TO_KEEP" ]; then
         echo "$LINE" >> "$TMP_FILE"
     else
         echo "Searching for peer file containing public key: $PEER"
-        for FILE in /app/peers/*; do
+        for FILE in $PEERS_DIR/*; do
             if grep -q "$PEER" "$FILE"; then
-                echo "Deleting file: $FILE (inactive for $AGE days)"
+                echo "Deleting file: $FILE (inactive for $AGE minutes)"
                 rm -f "$FILE"
+                PEERS_REMOVED=1
                 break
             fi
         done
     fi
 done < "$INACTIVE_PEERS_FILE"
+
+# If There were peers removed, then rebuild wireguard and the proxy config
+if [[ "$PEERS_REMOVED" == "1" ]]; then
+    ./rebuild_and_start_wg.sh
+    ./build_proxy_conf.sh
+fi
 
 cat "$TMP_FILE" > "$INACTIVE_PEERS_FILE"

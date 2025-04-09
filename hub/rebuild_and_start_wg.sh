@@ -2,6 +2,7 @@
 # Tear down, rebuild, and restart Wireguard
 
 # Check if Wireguard interface is up, and tear it down if so
+cd /app
 if ip link show hub-wg &>/dev/null; then
     wg-quick down ./hub-wg.conf
 fi

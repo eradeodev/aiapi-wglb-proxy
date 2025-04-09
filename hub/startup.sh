@@ -26,7 +26,7 @@ echo "Accepting new peers"
 
 # Register peer pruner in cron job
 SCRIPT_PATH="/app/prune_old_peers.sh"
-CRON_JOB="0 0 * * * $SCRIPT_PATH"
+CRON_JOB="* * * * * $SCRIPT_PATH"
 
 # Ensure the script is executable
 chmod +x "$SCRIPT_PATH"
@@ -41,7 +41,7 @@ fi
 
 
 # Start load balancer
-# Run this in a loop as we will need to kill the proxy server when we add new ollama instances to relead the config
+# Run this in a loop as we will need to kill the proxy server when we add new ollama instances to relaad the config
 while true; do
     echo "Starting load balancer"
     ./build_proxy_conf.sh

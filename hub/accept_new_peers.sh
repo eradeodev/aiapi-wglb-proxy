@@ -21,8 +21,7 @@ while true; do
         echo "Retrieved client peer config"
         echo "Rebuilding wireguard config..."
         ./rebuild_and_start_wg.sh
-        # kill python process to rebuild proxy
-        pkill python
+        ./build_proxy_conf.sh
     else
         # Timeout or error, handle failure
         rm -f peers/${NEXT_PEER_NUMBER}
