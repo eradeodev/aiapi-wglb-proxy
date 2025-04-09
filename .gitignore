@@ -1,1 +1,3 @@
 .env
+hub-wg.conf
+peers/
