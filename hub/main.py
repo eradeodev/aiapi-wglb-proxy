@@ -18,8 +18,9 @@ from pathlib import Path
 import csv
 import datetime
 import socket
+import threading
 
-def get_config(filename):
+def get_servers_from_config(filename):
     config = configparser.ConfigParser()
     config.read(filename)
     return [
@@ -29,6 +30,37 @@ def get_config(filename):
 
 
 # Read the authorized users and their keys from a file
+
+threadlock = threading.Lock()
+servers = []
+
+def update_servers_from_config(filename):
+    with threadlock:
+        global servers
+        # Create a dictionary from the current servers for easy lookup
+        current_servers_dict = {name: data for name, data in servers}
+        
+        # Load new configuration
+        new_config = get_servers_from_config(filename)
+        
+        # Build the updated server list
+        updated_servers = []
+        for name, new_data in new_config:
+            if name in current_servers_dict:
+                # Preserve existing queue
+                old_data = current_servers_dict[name]
+                if old_data["url"] == new_data["url"]:
+                    # No URL change, keep old data
+                    updated_servers.append((name, old_data))
+                else:
+                    # URL changed, keep old queue but update URL
+                    updated_servers.append((name, {"url": new_data["url"], "queue": old_data["queue"]}))
+            else:
+                # New server, add with new queue
+                updated_servers.append((name, new_data))
+
+        # Replace the global servers list with the updated one
+        servers = updated_servers
 
 
 def get_authorized_users(filename):
@@ -64,6 +96,8 @@ def main():
         "-d", "--deactivate_security", action="store_true", help="Deactivates security"
     )
     args = parser.parse_args()
+    global servers
+    servers = get_servers_from_config(args.config)
     authorized_users = get_authorized_users(args.users_list)
     deactivate_security = args.deactivate_security
     ASCIIColors.red("Ollama Proxy server")
@@ -73,7 +107,7 @@ def main():
         def get_reachable_servers(self):
             """Returns list of servers sorted by queue size and filtered by network reachability"""
             reachable = []
-            servers = get_config(args.config)
+            update_servers_from_config(args.config)
             for server in servers:
                 server_name, config = server
                 try:
