@@ -10,7 +10,7 @@ mkdir -p "$directory"
 rm -f "$output_file"
 cp "base_config.txt" "$output_file"
 if [ -d "$directory" ]; then
-    for file in ; do
+    for file in "$directory"/*; do
         cat "$file" >> "$output_file"
     done
 fi
