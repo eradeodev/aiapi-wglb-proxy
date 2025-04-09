@@ -327,14 +327,29 @@ def main():
                             finally:
                                 load_tracker.get_nowait()
                         elif path == "/api/pull":
-                            response = requests.request(
-                                self.command,
-                                config["url"] + path,
-                                params=get_params,
-                                data=post_data,
-                            )
-                            self._send_response(response)
-                            return # Pull request sent, no retry needed
+                            # @Work @HI Increase robustness of api/pull logic as currently if a spoke is down when this goes out it won't get the model -- instead when spokes connect to the hub we should query the models they have, and when a request for a given model comes in it should check if any spokes are missing it and pull it on those spokes, ensuring all eventually pull used models.
+                            for server_info in reachable_servers:
+                                server_name, config = server_info
+                                try:
+                                    response = requests.request(
+                                        self.command,
+                                        config["url"] + path,
+                                        params=get_params,
+                                        data=post_data,
+                                    )
+                                    self._send_response(response)
+                                except requests.exceptions.RequestException as e:
+                                    ASCIIColors.yellow(f"Error pulling from {server_name}: {e}")
+                                    self.add_access_log_entry(
+                                        event="pull_error",
+                                        user=self.user,
+                                        ip_address=client_ip,
+                                        access="Authorized",
+                                        server=server_name,
+                                        nb_queued_requests_on_server=-1,
+                                        error=str(e),
+                                    )
+                            return  # Pull request sent to all reachable servers
                         else:
                             response = requests.request(
                                 self.command,
