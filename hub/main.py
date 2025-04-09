@@ -201,6 +201,7 @@ def main():
                 writer.writerow(row)
 
         def _send_response(self, response, message=""):
+            self.custom_log_message(response, message)
             self.send_response(response.status_code, message)
             for key, value in response.headers.items():
                 if key.lower() not in [
@@ -218,11 +219,13 @@ def main():
             except BrokenPipeError:
                 pass
 
-        def log_message(self, format, *args):
+        def custom_log_message(self, response, message=""):
             server_name = getattr(self, "active_server_name", "unset server name!")
             # Add the server name to the log
             sys.stderr.write("%s - %s\n" % (server_name, format % args))
 
+        def log_message(self, format, *args):
+            return
 
         def do_HEAD(self):
             self._handle_request()
