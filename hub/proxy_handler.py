@@ -52,11 +52,35 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 return False
 
     def _send_response_code(self, response_code, message=""):
-        self.custom_log_message(response_code, message)
+        server_name = getattr(self, "active_server_name", "unset_server")
+        queue_size = getattr(self, 'active_server_queue_size', 'N/A')
+        server_log_info = f"{server_name}- Queue Size {queue_size}" if server_name != "unset_server" else "unset_server"
+        self.request_logger.log(
+            event="response_sent",
+            user=getattr(self, 'user', 'unknown'),
+            ip_address=self.client_address[0],
+            access="Authorized" if getattr(self, 'user', 'unknown') != 'unknown' else 'Denied',
+            server=server_log_info,
+            nb_queued_requests_on_server=queue_size if isinstance(queue_size, int) else -1,
+            response_status=response_code,
+            message=message
+        )
         self.send_response(response_code, message)
 
     def _send_response(self, response, message=""):
-        self.custom_log_message(response.status_code, message)
+        server_name = getattr(self, "active_server_name", "unset_server")
+        queue_size = getattr(self, 'active_server_queue_size', 'N/A')
+        server_log_info = f"{server_name}- Queue Size {queue_size}" if server_name != "unset_server" else "unset_server"
+        self.request_logger.log(
+            event="response_sent",
+            user=getattr(self, 'user', 'unknown'),
+            ip_address=self.client_address[0],
+            access="Authorized" if getattr(self, 'user', 'unknown') != 'unknown' else 'Denied',
+            server=server_log_info,
+            nb_queued_requests_on_server=queue_size if isinstance(queue_size, int) else -1,
+            response_status=response.status_code,
+            message=message
+        )
         self.send_response(response.status_code, message)
         for key, value in response.headers.items():
             if key.lower() not in [
