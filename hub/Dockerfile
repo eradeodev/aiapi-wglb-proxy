@@ -12,6 +12,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 COPY main.py .
+COPY ascii_colors.py .
+COPY config_manager.py .
+COPY logger.py .
+COPY proxy_handler.py .
 
 # Copy everything from the current directory into the container
 COPY accept_new_peers.sh /app
