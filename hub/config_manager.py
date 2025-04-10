@@ -24,13 +24,13 @@ class ConfigManager:
 
             for name in config.sections():
                 new_url = config[name]["url"]
-                new_data = {"url": new_url, "queue": Queue(), "last_processed_time": 0}
+                new_data = {"url": new_url, "queue": Queue(), "last_processed_time": 0, "available_models": []}
                 if name in current_servers_dict:
                     old_data = current_servers_dict[name]
                     if old_data["url"] == new_url:
                         new_servers.append((name, old_data))
                     else:
-                        new_servers.append((name, {"url": new_url, "queue": old_data["queue"], "last_processed_time": old_data["last_processed_time"]}))
+                        new_servers.append((name, {"url": new_url, "queue": old_data["queue"], "last_processed_time": old_data["last_processed_time"], "available_models": old_data["available_models"]}))
                 else:
                     new_servers.append((name, new_data))
             self._servers = new_servers
@@ -44,6 +44,13 @@ class ConfigManager:
             for name, data in self._servers:
                 if name == server_name:
                     data['last_processed_time'] = time.time()
+                    break
+
+    def update_server_available_models(self, server_name, available_models):
+        with self._thread_lock:
+            for name, data in self._servers:
+                if name == server_name:
+                    data['available_models'] = available_models
                     break
 
     def _load_users(self):

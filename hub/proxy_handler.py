@@ -1,4 +1,3 @@
-# file: proxy_handler.py
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from config_manager import ConfigManager
@@ -19,12 +18,16 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
     def get_reachable_servers(self):
         """Returns list of servers sorted by queue size and filtered by network reachability"""
         reachable = []
-        self.config_manager._load_config() # Ensure config is up-to-date
+        self.config_manager._load_config()  # Ensure config is up-to-date
         servers = self.config_manager.get_servers()
         for server in servers:
             server_name, config = server
             try:
                 if self._is_server_reachable(server_name, config["url"]):
+                    # Update available models for the server before considering it reachable
+                    available_models = self.get_server_available_models(server_name, config["url"])
+                    # (The config manager now holds an up-to-date list of models.)
+                    config["available_models"] = available_models
                     reachable.append(server)
             except Exception as e:
                 ASCIIColors.yellow(
@@ -34,6 +37,41 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             reachable,
             key=lambda s: (s[1]["queue"].qsize(), s[1]['last_processed_time'])
         )
+
+    def get_server_available_models(self, server_name, server_url):
+        """
+        Queries the server for its available models via a GET request to /api/tags.
+        The expected JSON response should have a structure like:
+        {
+           "models": [
+             { "name": "codellama:13b" },
+             { "name": "llama3:latest" }
+           ]
+        }
+        On success, updates the server configuration via config_manager and returns the list of model names.
+        """
+        self.request_logger.log(
+            event="retrieving_models",
+            user="proxy_server",
+            ip_address=self.client_address[0],
+            access="Authorized",
+            server=server_name,
+            nb_queued_requests_on_server=-1,
+            response_status=0,
+            message="Getting available models from server",
+        )
+        try:
+            response = requests.get(f"{server_url}/api/tags", timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            models_data = data.get("models", [])
+            available_models = [model["name"] for model in models_data if "name" in model]
+            # Update the configuration
+            self.config_manager.update_server_available_models(server_name, available_models)
+            return available_models
+        except Exception as e:
+            ASCIIColors.yellow(f"Failed retrieving models for server {server_name}: {e}")
+            return []
 
     def _is_server_reachable(self, server_name, server_url):
         """Checks if a server is reachable."""
@@ -167,7 +205,10 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         return path, get_params, post_data
 
     def _route_request(self, path, get_params, post_data, reachable_servers):
-        """Routes the request to a proxy server, retrying the request if an internal server exception occurs, or a server cannot be reached, in a round-robin fashion up to 3 times. All other exceptions will return to the caller immediately the error."""
+        """
+        Routes the request to a proxy server with retries.
+        Implements auto-pulling of missing models for generate endpoints.
+        """
         client_ip, _ = self.client_address
         max_retries = 3
         attempt = 0
@@ -192,7 +233,42 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
                 start_time = time.time()
                 try:
+                    # For generation endpoints, check if requested model is available
                     if path in ["/api/generate", "/api/embed", "/api/chat", "/v1/chat/completions"]:
+                        # Decode post data for model extraction
+                        post_data_dict = {}
+                        if isinstance(post_data, bytes):
+                            try:
+                                post_data_dict = json.loads(post_data.decode("utf-8"))
+                            except json.JSONDecodeError:
+                                ASCIIColors.yellow("Could not decode post data as JSON.")
+                        
+                        model = post_data_dict.get("model")
+                        if model:
+                            # Check against the server's available_models list
+                            if model not in config.get("available_models", []):
+                                ASCIIColors.yellow(f"Model '{model}' not available on server {server_name}. Auto-pulling...")
+                                try:
+                                    pull_response = requests.post(
+                                        config["url"] + "/api/pull",
+                                        json={"model": model},
+                                        timeout=proxy_timeout,
+                                    )
+                                    pull_response.raise_for_status()
+                                    # Optionally re-query the available models after pulling
+                                    updated_models = self.get_server_available_models(server_name, config["url"])
+                                    config["available_models"] = updated_models
+                                    if model not in updated_models:
+                                        ASCIIColors.red(f"Model '{model}' still not available after pull on server {server_name}.")
+                                        # Continue to next server if pull did not update available models.
+                                        continue
+                                    else:
+                                        ASCIIColors.yellow(f"Successfully pulled model '{model}' on server {server_name}.")
+                                except Exception as pull_exception:
+                                    ASCIIColors.red(f"Failed to auto-pull model '{model}' on server {server_name}: {pull_exception}")
+                                    # If pull fails, try the next available server.
+                                    continue
+
                         load_tracker = config["queue"]
                         self.request_logger.log(
                             event="gen_request",
@@ -207,14 +283,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                         )
                         load_tracker.put_nowait(1)
                         try:
-                            post_data_dict = {}
-                            if isinstance(post_data, bytes):
-                                post_data_str = post_data.decode("utf-8")
-                                try:
-                                    post_data_dict = json.loads(post_data_str)
-                                except json.JSONDecodeError:
-                                    ASCIIColors.yellow("Could not decode post data as JSON.")
-
                             response = requests.request(
                                 self.command,
                                 config["url"] + path,
@@ -282,7 +350,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                         finally:
                             load_tracker.get_nowait()
                     elif path == "/api/pull":
-                        # @Work @HI Increase robustness of api/pull logic as currently if a spoke is down when this goes out it won't get the model -- instead when spokes connect to the hub we should query the models they have, and when a request for a given model comes in it should check if any spokes are missing it and pull it on those spokes, ensuring all eventually pull used models. Also pull should run in parallel using concurrent.futures.ThreadPoolExecutor
+                        # For /api/pull, pass the request to all reachable servers.
                         for server_info in reachable_servers:
                             server_name, config = server_info
                             start_time_pull = time.time()
@@ -331,6 +399,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                                 self._send_response(getattr(e.response, 'content', b'').decode('utf-8'), f"/api/pull request handling failed, GET params={get_params}, POST data={post_data}")
                         return  # Pull request sent to all reachable servers
                     else:
+                        # For all other requests, simply proxy the call.
                         response = requests.request(
                             self.command,
                             config["url"] + path,
@@ -378,7 +447,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                             if 400 <= e.response.status_code < 500:
                                 self._send_response(e.response, f"General request handling failed, GET params={get_params}, POST data={post_data}")
                                 return
-                            # For 5xx errors, we will retry
                         except requests.exceptions.RequestException as e:
                             end_time_other = time.time()
                             duration_other = end_time_other - start_time_other
@@ -429,7 +497,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                         request_params=get_params,
                         request_body=post_data.decode('utf-8', errors='ignore') if isinstance(post_data, bytes) else str(post_data),
                     )
-
             tried_servers_overall.extend(tried_servers_this_attempt)
 
         # If all retries failed
@@ -503,7 +570,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 request_params=get_params,
                 request_body=post_data.decode('utf-8', errors='ignore') if isinstance(post_data, bytes) else str(post_data),
             )
-
         finally:
             end_time = time.time()
             duration = end_time - start_time
@@ -519,3 +585,4 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 request_params=getattr(self, 'get_params', {}),
                 request_body=getattr(self, 'post_data', b'').decode('utf-8', errors='ignore') if isinstance(getattr(self, 'post_data', b''), bytes) else str(getattr(self, 'post_data', b'')),
             )
+
