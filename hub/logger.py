@@ -27,6 +27,7 @@ class RequestLogger:
                     "request_body",
                     "response_status",
                     "error",
+                    "message",
                 ]
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
@@ -45,6 +46,7 @@ class RequestLogger:
         request_body=None,
         response_status=None,
         error="",
+        message="",
     ):
         with open(self.log_file_path, mode="a", newline="") as csvfile:
             fieldnames = [
@@ -61,6 +63,7 @@ class RequestLogger:
                 "request_body",
                 "response_status",
                 "error",
+                "message",
             ]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             row = {
@@ -77,6 +80,7 @@ class RequestLogger:
                 "request_body": request_body if request_body is not None else "",
                 "response_status": response_status if response_status is not None else "",
                 "error": error,
+                "message": message,
             }
             writer.writerow(row)
             sys.stderr.write(f"{row}\n")
