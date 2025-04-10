@@ -1,6 +1,7 @@
 # file: proxy_handler.py
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
+from config_manager import ConfigManager
 import requests
 import json
 import socket
