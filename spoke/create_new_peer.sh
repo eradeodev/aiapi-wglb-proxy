@@ -20,7 +20,7 @@ interval=1
 elapsed=0
 SPOKE_IP=""
 while [ $elapsed -lt $timeout ]; do
-    SPOKE_IP=$(nc $HUB_WG_IP 1234 -w 1)
+    SPOKE_IP=$(nc $HUB_WG_IP 1234 -w 5)
     if [ -n "$SPOKE_IP" ]; then
         break
     fi
@@ -47,7 +47,7 @@ EOF
 elapsed=0
 while [ $elapsed -lt $timeout ]; do
     echo "Trying to send new peer config..."
-    nc $HUB_WG_IP 1235 -N < new_peer.txt && break
+    nc $HUB_WG_IP 1235 -w 5 -N < new_peer.txt && break
     sleep $interval
     elapsed=$((elapsed + interval))
 done

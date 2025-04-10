@@ -50,6 +50,8 @@ function create_new_config {
     ./create_new_peer.sh
     if [ $? -ne 0 ]; then
         echo "creating config failed."
+        # Kill any background processes we've started
+        jobs -p | xargs -r kill
         exit 1
     fi
 
@@ -113,5 +115,5 @@ done
 
 # start ollama
 echo "Starting ollama"
-/bin/ollama serve
+exec /bin/ollama serve
 
