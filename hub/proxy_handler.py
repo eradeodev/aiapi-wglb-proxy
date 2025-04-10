@@ -9,6 +9,7 @@ import time
 from ascii_colors import ASCIIColors
 import datetime
 import sys
+import traceback
 
 class ProxyRequestHandler(BaseHTTPRequestHandler):
     config_manager = None
@@ -447,43 +448,67 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         """Main handler for incoming requests."""
         start_time = time.time()
         client_ip, _ = self.client_address
-        if not self._handle_security():
-            return
+        try:
+            if not self._handle_security():
+                return
 
-        path, get_params, post_data = self._get_request_data()
-        reachable_servers = self.get_reachable_servers()
+            path, get_params, post_data = self._get_request_data()
+            reachable_servers = self.get_reachable_servers()
 
-        if not reachable_servers:
-            not_available_message = f"No reachable Ollama servers available. Reachable Servers: {reachable_servers}, Servers: {self.config_manager.get_servers()}"
-            self._send_response_code(503, not_available_message)
+            if not reachable_servers:
+                not_available_message = f"No reachable Ollama servers available. Reachable Servers: {reachable_servers}, Servers: {self.config_manager.get_servers()}"
+                self._send_response_code(503, not_available_message)
+                self.end_headers()
+                ASCIIColors.red(not_available_message)
+                self.request_logger.log(
+                    event="error",
+                    user=self.user,
+                    ip_address=client_ip,
+                    access="Denied",
+                    server="None",
+                    nb_queued_requests_on_server=-1,
+                    error="No reachable Ollama servers",
+                    request_path=path,
+                    request_params=get_params,
+                    request_body=post_data.decode('utf-8', errors='ignore') if isinstance(post_data, bytes) else str(post_data),
+                )
+                return
+
+            self._route_request(path, get_params, post_data, reachable_servers)
+
+        except Exception as e:
+            end_time = time.time()
+            duration = end_time - start_time
+            ASCIIColors.red(f"An unexpected error occurred while handling the request: {e}")
+            traceback.print_exc()  # Print the traceback to stderr for debugging
+            self._send_response_code(500, "Internal Server Error")
             self.end_headers()
-            ASCIIColors.red(not_available_message)
             self.request_logger.log(
                 event="error",
-                user=self.user,
+                user=getattr(self, 'user', 'unknown'),
                 ip_address=client_ip,
                 access="Denied",
                 server="None",
                 nb_queued_requests_on_server=-1,
-                error="No reachable Ollama servers",
-                request_path=path,
+                error=f"Unexpected error: {e}",
+                duration=duration,
+                request_path=getattr(self, 'path', 'unknown'),
                 request_params=get_params,
                 request_body=post_data.decode('utf-8', errors='ignore') if isinstance(post_data, bytes) else str(post_data),
             )
-            return
 
-        self._route_request(path, get_params, post_data, reachable_servers)
-        end_time = time.time()
-        duration = end_time - start_time
-        self.request_logger.log(
-            event="request_served",
-            user=self.user,
-            ip_address=client_ip,
-            access="Authorized",
-            server=getattr(self, 'active_server_name', 'None'),
-            nb_queued_requests_on_server=getattr(self, 'active_server_queue_size', -1),
-            duration=duration,
-            request_path=path,
-            request_params=get_params,
-            request_body=post_data.decode('utf-8', errors='ignore') if isinstance(post_data, bytes) else str(post_data),
-        )
+        finally:
+            end_time = time.time()
+            duration = end_time - start_time
+            self.request_logger.log(
+                event="request_served",
+                user=getattr(self, 'user', 'unknown'),
+                ip_address=client_ip,
+                access="Authorized" if getattr(self, 'user', 'unknown') != 'unknown' else 'Denied',
+                server=getattr(self, 'active_server_name', 'None'),
+                nb_queued_requests_on_server=getattr(self, 'active_server_queue_size', -1),
+                duration=duration,
+                request_path=getattr(self, 'path', 'unknown'),
+                request_params=getattr(self, 'get_params', {}),
+                request_body=getattr(self, 'post_data', b'').decode('utf-8', errors='ignore') if isinstance(getattr(self, 'post_data', b''), bytes) else str(getattr(self, 'post_data', b'')),
+            )

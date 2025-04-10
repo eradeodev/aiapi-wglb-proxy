@@ -2,6 +2,7 @@
 import csv
 from pathlib import Path
 import datetime
+import sys
 
 class RequestLogger:
     def __init__(self, log_file_path):
@@ -78,3 +79,5 @@ class RequestLogger:
                 "error": error,
             }
             writer.writerow(row)
+            sys.stderr.write(f"{row}\n")
+
