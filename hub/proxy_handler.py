@@ -172,7 +172,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         max_retries = 3
         attempt = 0
         tried_servers_overall = []
-        proxy_timeout = (60, 1500)  # (connect timeout, read timeout)
+        proxy_timeout = (60, 3600)  # (connect timeout, read timeout)
         while attempt < max_retries:
             attempt += 1
             tried_servers_this_attempt = []
