@@ -77,7 +77,7 @@ class RequestLogger:
                 "duration": duration if duration is not None else "",
                 "request_path": request_path if request_path is not None else "",
                 "request_params": str(request_params) if request_params is not None else "",
-                "request_body": request_body if request_body is not None else "",
+                "request_body": request_body if request_body is not None and "model" not in request_body else "",
                 "response_status": response_status if response_status is not None else "",
                 "error": error,
                 "message": message,
