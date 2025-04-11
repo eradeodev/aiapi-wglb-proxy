@@ -12,6 +12,13 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
     request_logger = None
     deactivate_security = False
 
+    def _normalize_model_name(self, name):
+        """Removes ':latest' suffix from a model name if present."""
+        if name and name.endswith(':latest'):
+            # Return the name without the last 7 characters (':latest')
+            return name[:-7]
+        return name
+
     def get_reachable_servers(self, path):
         """Returns list of servers sorted by queue size and filtered by network reachability and ability to serve the given request path"""
         reachable = []
@@ -267,8 +274,14 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                             updated_models = self.get_server_available_models(server_name, config["url"])
                             config["available_models"] = updated_models
 
-                            # Check against the server's available_models list
-                            if model not in updated_models:
+                            normalized_model = self._normalize_model_name(model)
+                            # Try exact match
+                            matched_model = next((m for m in updated_models if self._normalize_model_name(m) == normalized_model), None)
+                            # If no exact match, try substring (fuzzy) match
+                            if not matched_model:
+                                matched_model = next((m for m in updated_models if normalized_model in self._normalize_model_name(m)), None)
+
+                            if not matched_model:
                                 ASCIIColors.yellow(f"Model '{model}' not available on server {server_name}. Available models were: {updated_models} ... Auto-pulling...")
                                 try:
                                     pull_response = requests.post(
@@ -293,6 +306,8 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                                     ASCIIColors.red(f"Failed to auto-pull model '{model}' on server {server_name}: {pull_exception}")
                                     # If pull fails, try the next available server.
                                     continue
+                            else:
+                                model = matched_model
 
                         load_tracker = config["queue"]
                         self.request_logger.log(
