@@ -29,7 +29,7 @@ service cron start
 
 # Register peer pruner in cron job
 SCRIPT_PATH="/app/prune_old_peers.sh"
-CRON_JOB="* * * * * $SCRIPT_PATH"
+CRON_JOB="* * * * * $SCRIPT_PATH >> /proc/1/fd/1 2>> /proc/1/fd/2"
 
 # Ensure the script is executable
 chmod +x "$SCRIPT_PATH"
