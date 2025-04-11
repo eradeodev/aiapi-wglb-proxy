@@ -18,8 +18,8 @@ fi
 INACTIVE_PEERS=()
 while read -r PEER_KEY; do
     HANDSHAKE_TIME=$(wg show hub-wg latest-handshakes | grep "$PEER_KEY" | awk '{print $2}')
-    # Consider peers with 0 handshake time as inactive
-    if [ "$HANDSHAKE_TIME" = "0" ]; then
+    # Add peer if handshake time is 0 or older than 10 minutes
+    if [ "$HANDSHAKE_TIME" = "0" ] || [ $((CURRENT_EPOCH - HANDSHAKE_TIME)) -gt 600 ]; then
         INACTIVE_PEERS+=("$PEER_KEY")
     fi
 done < <(wg show hub-wg peers)
@@ -27,14 +27,16 @@ done < <(wg show hub-wg peers)
 echo "Current inactive peers (Handshake=0): ${INACTIVE_PEERS[*]}"
 
 # Ensure log file exists
+mkdir -p $(dirname "$INACTIVE_PEERS_FILE")
 touch "$INACTIVE_PEERS_FILE"
 
 # Add newly inactive peers with the current timestamp if not already logged
 for PEER_KEY in "${INACTIVE_PEERS[@]}"; do
     # Use grep -q -F to treat PEER_KEY as fixed string, preventing regex issues
+    ALLOWED_IPS=$(wg show hub-wg allowed-ips | grep "$PEER_KEY" | awk '{print $2}')
     if ! grep -q -F "$PEER_KEY" "$INACTIVE_PEERS_FILE"; then
         echo "Logging new inactive peer: $PEER_KEY"
-        echo "$PEER_KEY $CURRENT_EPOCH" >> "$INACTIVE_PEERS_FILE"
+        echo "$PEER_KEY $ALLOWED_IPS $CURRENT_EPOCH" >> "$INACTIVE_PEERS_FILE"
     fi
 done
 
@@ -65,7 +67,8 @@ TMP_PRUNE_LOG=$(mktemp)
 PEERS_REMOVED=0
 while IFS= read -r LINE; do
     PEER_KEY=$(echo "$LINE" | awk '{print $1}')
-    FIRST_SEEN_INACTIVE=$(echo "$LINE" | awk '{print $2}')
+    PEER_ALLOWED_IPS=$(echo "$LINE" | awk '{print $2}')
+    FIRST_SEEN_INACTIVE=$(echo "$LINE" | awk '{print $3}')
     AGE_SECONDS=$(( CURRENT_EPOCH - FIRST_SEEN_INACTIVE ))
     AGE_MINUTES=$(( AGE_SECONDS / 60 ))
 
@@ -85,6 +88,7 @@ while IFS= read -r LINE; do
                 # --- Remove Peer Dynamically ---
                 echo "Removing peer $PEER_KEY from hub-wg interface..."
                 if wg set hub-wg peer "$PEER_KEY" remove; then
+                    ip -4 route delete "$PEER_ALLOWED_IPS" dev hub-wg
                     echo "Successfully removed peer $PEER_KEY from WireGuard interface."
                     echo "Deleting peer config file: $FILE"
                     rm -f "$FILE"
