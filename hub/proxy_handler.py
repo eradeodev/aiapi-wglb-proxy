@@ -227,6 +227,21 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 post_data = self.rfile.read(content_length)
         return path, get_params, post_data
 
+    def match_model(self, model, models):
+        # Try exact match
+        matched_model = next((m for m in models if m == model), None)
+
+        # Try normalized match
+        normalized_model = self._normalize_model_name(model)
+        if not matched_model:
+            matched_model = next((m for m in models if self._normalize_model_name(m) == normalized_model), None)
+
+        # If no exact match, try substring (fuzzy) match
+        if not matched_model:
+            matched_model = next((m for m in models if normalized_model in self._normalize_model_name(m)), None)
+        return matched_model
+
+
     def _route_request(self, path, get_params, post_data, reachable_servers):
         """
         Routes the request to a proxy server with retries.
@@ -270,22 +285,19 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                         model = post_data_dict.get("model")
                         if model:
 
-                            # First update models via /api/tags
+                            # First get list of models via /api/tags:
                             updated_models = self.get_server_available_models(server_name, config["url"])
                             config["available_models"] = updated_models
 
-                            normalized_model = self._normalize_model_name(model)
-                            # Try exact match
-                            matched_model = next((m for m in updated_models if self._normalize_model_name(m) == normalized_model), None)
-                            # If no exact match, try substring (fuzzy) match
-                            if not matched_model:
-                                matched_model = next((m for m in updated_models if normalized_model in self._normalize_model_name(m)), None)
+                            # Find a matching model:
+                            matched_model = self.match_model(model, updated_models)
+
                             # Assign model if matched:
                             if matched_model:
                                 model = matched_model
                                 # Update the model in post_data_dict and re-encode
                                 post_data_dict["model"] = model
-                                post_data = json.dumps(post_data_dict).encode("utf-8")
+                                json.dumps(post_data_dict).encode("utf-8")
 
                             if not matched_model:
                                 ASCIIColors.yellow(f"Model '{model}' not available on server {server_name}. Available models were: {updated_models} ... Auto-pulling...")
@@ -295,22 +307,27 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                                         json={"model": model},
                                         timeout=proxy_timeout,
                                     )
-                                    ASCIIColors.yellow(f"{server_name} pull response: {pull_response}")
+                                    ASCIIColors.yellow(f"{server_name} pull response: {json.dumps(pull_response)}")
 
                                     pull_response.raise_for_status()
                                     # Re-query the available models after pulling
                                     updated_models = self.get_server_available_models(server_name, config["url"])
-                                    ASCIIColors.yellow(f"Model '{model}' still not available on server {server_name} after pull. Available models were: {updated_models}")
                                     config["available_models"] = updated_models
-                                    if model not in updated_models:
-                                        ASCIIColors.red(f"Model '{model}' still not available after pull on server {server_name}. Trying next server.")
+
+                                    matched_model = self.match_model(model, updated_models)
+                                    # Assign model if matched:
+                                    if matched_model:
+                                        model = matched_model
+                                        # Update the model in post_data_dict and re-encode
+                                        post_data_dict["model"] = model
+                                        json.dumps(post_data_dict).encode("utf-8")
+
+                                    if not matched_model:
+                                        ASCIIColors.red(f"Model '{matched_model}' still not available after pull on server {server_name}. Available models were: {updated_models}. Trying next server.")
                                         # Continue to next server if pull did not update available models.
                                         continue
                                     else:
                                         ASCIIColors.yellow(f"Successfully pulled model '{model}' on server {server_name}.")
-                                        # Update the model in post_data_dict and re-encode after successful pull
-                                        post_data_dict["model"] = model
-                                        post_data = json.dumps(post_data_dict).encode("utf-8")
                                 except Exception as pull_exception:
                                     ASCIIColors.red(f"Failed to auto-pull model '{model}' on server {server_name}: {pull_exception}")
                                     # If pull fails, try the next available server.
