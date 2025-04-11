@@ -389,11 +389,12 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                                 nb_queued_requests_on_server=load_tracker.qsize(),
                                 error=str(e),
                                 duration=duration,
+                                response_status=getattr(e.response, 'status_code', None),
                                 request_path=path,
                                 request_params=get_params,
                                 request_body=post_data.decode('utf-8', errors='ignore') if isinstance(post_data, bytes) else str(post_data),
                             )
-                            self._send_response(e.response, f"Generate request handling failed, GET params={get_params}, POST data={post_data}")
+                            # Let the loop continue to try the next server or fail after retries.
                         finally:
                             load_tracker.get_nowait()
                     elif path == "/api/pull":
@@ -443,7 +444,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                                     request_body=post_data.decode('utf-8', errors='ignore') if isinstance(post_data, bytes) else str(post_data),
                                     response_status=getattr(e.response, 'status_code', None)
                                 )
-                                self._send_response(getattr(e.response, 'content', b'').decode('utf-8'), f"/api/pull request handling failed, GET params={get_params}, POST data={post_data}")
                         return  # Pull request sent to all reachable servers
                     else:
                         # For all other requests, simply proxy the call.
