@@ -238,8 +238,9 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                         # Decode post data for model extraction
                         post_data_dict = {}
                         if isinstance(post_data, bytes):
+                            post_data_str = post_data.decode("utf-8")
                             try:
-                                post_data_dict = json.loads(post_data.decode("utf-8"))
+                                post_data_dict = json.loads(post_data_str)
                             except json.JSONDecodeError:
                                 ASCIIColors.yellow("Could not decode post data as JSON.")
                         

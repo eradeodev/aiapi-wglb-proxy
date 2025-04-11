@@ -1,3 +1,5 @@
+import sys
+
 class ASCIIColors:
     RED = "\033[91m"
     YELLOW = "\033[93m"
@@ -5,8 +7,8 @@ class ASCIIColors:
 
     @staticmethod
     def red(message):
-        print(f"{ASCIIColors.RED}{message}{ASCIIColors.RESET}")
+        sys.stderr.write(f"{ASCIIColors.RED}{message}{ASCIIColors.RESET}\n")
 
     @staticmethod
     def yellow(message):
-        print(f"{ASCIIColors.YELLOW}{message}{ASCIIColors.RESET}")
+        sys.stderr.write(f"{ASCIIColors.YELLOW}{message}{ASCIIColors.RESET}\n")
