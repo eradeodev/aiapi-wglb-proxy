@@ -307,7 +307,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                                         json={"model": model},
                                         timeout=proxy_timeout,
                                     )
-                                    ASCIIColors.yellow(f"{server_name} pull response: {json.dumps(pull_response)}")
+                                    ASCIIColors.yellow(f"{server_name} pull response: {pull_response.status_code} - {pull_response.text}")
 
                                     pull_response.raise_for_status()
                                     # Re-query the available models after pulling
