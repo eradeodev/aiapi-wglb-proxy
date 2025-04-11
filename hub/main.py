@@ -10,7 +10,6 @@ import argparse
 from http.server import HTTPServer
 from socketserver import ThreadingMixIn
 import time
-import sys
 
 from config_manager import ConfigManager
 from proxy_handler import ProxyRequestHandler

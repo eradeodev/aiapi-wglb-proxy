@@ -43,8 +43,7 @@ else
 fi
 
 
-# Start load balancer
-# Run this in a loop as we will need to kill the proxy server when we add new ollama instances to relaad the config
+# Start load balancer in a loop; if this script does exit, Docker should restart it due to restart=always:
 while true; do
     echo "Starting load balancer"
     ./build_proxy_conf.sh
