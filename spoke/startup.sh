@@ -38,9 +38,10 @@ function create_new_config {
             sleep 5
         fi
     done
+
     # Wait for connection to Hub
     echo "Waiting for connection to 10.123.123.1 via default config..."
-    while ! ping -c 1 -W 1 10.123.123.1 &> /dev/null; do
+    while ! ./check_host.sh 10.123.123.1; do
         echo "Waiting for connection to 10.123.123.1 via default config..."
         sleep 2
     done
@@ -54,6 +55,7 @@ function create_new_config {
         jobs -p | xargs -r kill
         exit 1
     fi
+
     echo "Peer config sent to hub. Waiting 2 seconds for hub processing..."
     sleep 2
     # Tear down default Wireguard config and set up new one
@@ -70,7 +72,7 @@ fi
 
 echo "Waiting for connection to 10.123.123.1 via new config..."
 count=0
-while ! ping -c 1 -W 1 10.123.123.1 &> /dev/null; do
+while ! ./check_host.sh 10.123.123.1; do
     ((count++))
     echo "Waiting for connection to 10.123.123.1 via new config..."
     sleep 2
@@ -87,7 +89,7 @@ echo "Connection established!"
 # Periodic connectivity check & auto-recovery
 (
 while true; do
-    if ! ping -c 1 -W 1 10.123.123.1 &> /dev/null; then
+    if ! ./check_host.sh 10.123.123.1; then
         echo "Lost connection to 10.123.123.1. Attempting recovery..."
         wg-quick down ./wg-configs/custom_config.conf
         sleep 2
@@ -95,7 +97,7 @@ while true; do
 
         # Wait and recheck connection
         retry=0
-        while ! ping -c 1 -W 1 10.123.123.1 &> /dev/null; do
+        while ! ./check_host.sh 10.123.123.1; do
             ((retry++))
             echo "Reconnection attempt $retry failed..."
             sleep 2
@@ -110,11 +112,10 @@ while true; do
 
         echo "Connection re-established!"
     fi
-    sleep 30  # Check every 30 seconds
+    sleep 30 # Check every 30 seconds
 done
 ) &
 
 # start ollama
 echo "Starting ollama"
 exec /bin/ollama serve
-

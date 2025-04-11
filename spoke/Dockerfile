@@ -12,6 +12,7 @@ WORKDIR /app
 COPY create_new_peer.sh /app
 COPY initial_config.conf /app
 COPY startup.sh /app
+COPY check_host.sh /app
 
 # Default command
 ENTRYPOINT ["/app/startup.sh"]
