@@ -44,7 +44,7 @@ fi
 
 
 # Start load balancer
-# Run this in a loop as we will need to kill the proxy server when we add new ollama instances to relaad the config
+# Run this in a loop as we will need to kill the proxy server when we add new ollama instances to reload the config
 while true; do
     echo "Starting load balancer"
     ./build_proxy_conf.sh
