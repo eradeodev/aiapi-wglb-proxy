@@ -101,7 +101,7 @@ while true; do
             ((retry++))
             echo "Reconnection attempt $retry failed..."
             sleep 2
-            if [[ $retry -eq 10 ]]; then
+            if [[ $retry -eq 2 ]]; then
                 echo "Failed to reconnect. Regenerating config..."
                 wg-quick down ./wg-configs/custom_config.conf
                 rm -f wg-configs/custom_config.conf
