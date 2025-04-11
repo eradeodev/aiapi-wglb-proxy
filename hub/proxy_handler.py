@@ -323,11 +323,11 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                                         json.dumps(post_data_dict).encode("utf-8")
 
                                     if not matched_model:
-                                        ASCIIColors.red(f"Model '{matched_model}' still not available after pull on server {server_name}. Available models were: {updated_models}. Trying next server.")
+                                        ASCIIColors.red(f"Model '{model}' still not available after pull on server {server_name}. Available models were: {updated_models}. Trying next server.")
                                         # Continue to next server if pull did not update available models.
                                         continue
                                     else:
-                                        ASCIIColors.yellow(f"Successfully pulled model '{model}' on server {server_name}.")
+                                        ASCIIColors.yellow(f"Successfully pulled model '{model}' (`{matched_model}`) on server {server_name}.")
                                 except Exception as pull_exception:
                                     ASCIIColors.red(f"Failed to auto-pull model '{model}' on server {server_name}: {pull_exception}")
                                     # If pull fails, try the next available server.
