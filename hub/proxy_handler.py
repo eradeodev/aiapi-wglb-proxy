@@ -1,13 +1,10 @@
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-from config_manager import ConfigManager
 import requests
 import json
 import socket
 import time
 from ascii_colors import ASCIIColors
-import datetime
-import sys
 import traceback
 
 class ProxyRequestHandler(BaseHTTPRequestHandler):
@@ -66,6 +63,18 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             data = response.json()
             models_data = data.get("models", [])
             available_models = [model["name"] for model in models_data if "name" in model]
+
+            self.request_logger.log(
+                event="retrieving_models",
+                user="proxy_server",
+                ip_address=self.client_address[0],
+                access="Authorized",
+                server=server_name,
+                nb_queued_requests_on_server=-1,
+                response_status=0,
+                message=f"Retrieved these models from {server_name}: {available_models}",
+            )
+
             # Update the configuration
             self.config_manager.update_server_available_models(server_name, available_models)
             return available_models
@@ -246,8 +255,13 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                         
                         model = post_data_dict.get("model")
                         if model:
+
+                            # First update models via /api/tags
+                            updated_models = self.get_server_available_models(server_name, config["url"])
+                            config["available_models"] = updated_models
+
                             # Check against the server's available_models list
-                            if model not in config.get("available_models", []):
+                            if model not in updated_models:
                                 ASCIIColors.yellow(f"Model '{model}' not available on server {server_name}. Auto-pulling...")
                                 try:
                                     pull_response = requests.post(
@@ -256,7 +270,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                                         timeout=proxy_timeout,
                                     )
                                     pull_response.raise_for_status()
-                                    # Optionally re-query the available models after pulling
+                                    # Re-query the available models after pulling
                                     updated_models = self.get_server_available_models(server_name, config["url"])
                                     config["available_models"] = updated_models
                                     if model not in updated_models:
