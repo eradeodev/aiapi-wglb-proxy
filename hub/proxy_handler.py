@@ -298,7 +298,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                                 model = matched_model
                                 # Update the model in post_data_dict and re-encode
                                 post_data_dict["model"] = model
-                                json.dumps(post_data_dict).encode("utf-8")
+                                post_data = json.dumps(post_data_dict).encode("utf-8")
 
                             if not matched_model:
                                 ASCIIColors.yellow(f"Model '{model}' not available on server {server_name}. Available models were: {updated_models} ... Auto-pulling...")
@@ -321,7 +321,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                                         model = matched_model
                                         # Update the model in post_data_dict and re-encode
                                         post_data_dict["model"] = model
-                                        json.dumps(post_data_dict).encode("utf-8")
+                                        post_data = json.dumps(post_data_dict).encode("utf-8")
 
                                     if not matched_model:
                                         ASCIIColors.red(f"Model '{model}' still not available after pull on server {server_name}. Available models were: {updated_models}. Trying next server.")
