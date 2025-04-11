@@ -294,6 +294,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
                             # Assign model if matched:
                             if matched_model:
+                                ASCIIColors.yellow(f"{server_name} found a matched model for {model}: {matched_model}")
                                 model = matched_model
                                 # Update the model in post_data_dict and re-encode
                                 post_data_dict["model"] = model
