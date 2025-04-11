@@ -54,7 +54,8 @@ function create_new_config {
         jobs -p | xargs -r kill
         exit 1
     fi
-
+    echo "Peer config sent to hub. Waiting 2 seconds for hub processing..."
+    sleep 2
     # Tear down default Wireguard config and set up new one
     wg-quick down ./initial_config.conf
     wg-quick up ./wg-configs/custom_config.conf

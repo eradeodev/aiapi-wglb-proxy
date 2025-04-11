@@ -24,6 +24,9 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                     # Only continue if server handles this request type
                     enabled = config.get("enabled_for_requests", [])
                     # An empty enabled value indicates all request are enabled; otherwise check if path is in enabled
+                    ASCIIColors.yellow(
+                        f"Server {server_name} enabled_for_requests = {enabled}"
+                    )
                     if not enabled or path in enabled:
                         # Update available models for the server before considering it reachable
                         available_models = self.get_server_available_models(server_name, config["url"])
