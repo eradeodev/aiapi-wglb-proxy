@@ -24,15 +24,24 @@ class ConfigManager:
 
             for name in config.sections():
                 new_url = config[name]["url"]
-                new_data = {"url": new_url, "queue": Queue(), "last_processed_time": 0, "available_models": []}
+                enabled_for_requests = [
+                    endpoint.strip() for endpoint in config[name].get("enabled_for_requests", "").split(",") if endpoint.strip()
+                ]
+                new_data = {"url": new_url, "queue": Queue(), "last_processed_time": 0, "available_models": [], "enabled_for_requests": enabled_for_requests,}
                 if name in current_servers_dict:
                     old_data = current_servers_dict[name]
                     if old_data["url"] == new_url:
+                        # Keep existing queue/timestamp/models, but update enabled_for_requests
+                        old_data["enabled_for_requests"] = enabled_for_requests
                         new_servers.append((name, old_data))
                     else:
-                        new_servers.append((name, {"url": new_url, "queue": old_data["queue"], "last_processed_time": old_data["last_processed_time"], "available_models": old_data["available_models"]}))
+                        new_data["queue"] = old_data["queue"]
+                        new_data["last_processed_time"] = old_data["last_processed_time"]
+                        new_data["available_models"] = old_data["available_models"]
+                        new_servers.append((name, new_data))
                 else:
                     new_servers.append((name, new_data))
+
             self._servers = new_servers
 
     def get_servers(self):

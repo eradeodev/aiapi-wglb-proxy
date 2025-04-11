@@ -8,8 +8,9 @@ mkdir -p /app/peers
 while true; do
     # Retrieve the next IP address
     NEXT_IP=$(./find_next_ip.sh)
+    echo "Offering IP $NEXT_IP to next connecting peer..."
     echo $NEXT_IP | nc -l -p 1234 -q 1
-    echo "Sent IP address to client"
+    echo "Sent IP address $NEXT_IP to client"
 
     # Calculate next peer number
     IFS='.' read -r a b c d <<< "$NEXT_IP"

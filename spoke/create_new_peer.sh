@@ -14,6 +14,7 @@ if [ -z "$HUB_PUB_KEY" ]; then
     exit 1
 fi
 
+
 # Attempt to retrieve SPOKE_IP with retries
 timeout=10
 interval=1
@@ -33,14 +34,14 @@ if [ -z "$SPOKE_IP" ]; then
     exit 1
 fi
 
-# Create new peer
+# Create new peer config content
 cat > new_peer.txt << EOF
 
 [Peer]
 PublicKey = $PUBLIC_KEY
 AllowedIPs = $SPOKE_IP/32
 PersistentKeepalive = 25
-
+EnabledForRequests = $ENABLED_FOR_REQUESTS
 EOF
 
 # Attempt to send new peer config with retries
@@ -71,4 +72,3 @@ AllowedIPs = $HUB_WG_IP/32
 Endpoint = $HUB_ENDPOINT
 PersistentKeepalive = 25
 EOF
-

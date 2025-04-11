@@ -12,6 +12,7 @@ services:
       - HUB_ENDPOINT=${HUB_ENDPOINT}
       - HUB_PUB_KEY=${HUB_PUB_KEY}
       - DEFAULT_PEER_PRIV_KEY=${DEFAULT_PEER_PRIV_KEY}
+      - ENABLED_FOR_REQUESTS=${ENABLED_FOR_REQUESTS}
       - OLLAMA_HOST=0.0.0.0
       - OLLAMA_KEEP_ALIVE=24h
     # Remove the Deploy item for CPU inference

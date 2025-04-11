@@ -12,8 +12,8 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
     request_logger = None
     deactivate_security = False
 
-    def get_reachable_servers(self):
-        """Returns list of servers sorted by queue size and filtered by network reachability"""
+    def get_reachable_servers(self, path):
+        """Returns list of servers sorted by queue size and filtered by network reachability and ability to serve the given request path"""
         reachable = []
         self.config_manager._load_config()  # Ensure config is up-to-date
         servers = self.config_manager.get_servers()
@@ -21,11 +21,15 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             server_name, config = server
             try:
                 if self._is_server_reachable(server_name, config["url"]):
-                    # Update available models for the server before considering it reachable
-                    available_models = self.get_server_available_models(server_name, config["url"])
-                    # (The config manager now holds an up-to-date list of models.)
-                    config["available_models"] = available_models
-                    reachable.append(server)
+                    # Only continue if server handles this request type
+                    enabled = config.get("enabled_for_requests", [])
+                    # An empty enabled value indicates all request are enabled; otherwise check if path is in enabled
+                    if not enabled or path in enabled:
+                        # Update available models for the server before considering it reachable
+                        available_models = self.get_server_available_models(server_name, config["url"])
+                        # (The config manager now holds an up-to-date list of models.)
+                        config["available_models"] = available_models
+                        reachable.append(server)
             except Exception as e:
                 ASCIIColors.yellow(
                     f"Server {server_name} unreachable: {str(e)}"
@@ -542,10 +546,10 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 return
 
             path, get_params, post_data = self._get_request_data()
-            reachable_servers = self.get_reachable_servers()
+            reachable_servers = self.get_reachable_servers(path)
 
             if not reachable_servers:
-                not_available_message = f"No reachable Ollama servers available. Reachable Servers: {reachable_servers}, Servers: {self.config_manager.get_servers()}"
+                not_available_message = f"No reachable Ollama servers available to handle {path}. Servers: {self.config_manager.get_servers()}"
                 self._send_response_code(503, not_available_message)
                 self.end_headers()
                 ASCIIColors.red(not_available_message)

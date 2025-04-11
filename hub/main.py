@@ -19,7 +19,7 @@ from ascii_colors import ASCIIColors
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config", default="config.ini", help="Path to the config file "
+        "--config", default="proxy_config.ini", help="Path to the config file "
     )
     parser.add_argument(
         "--log_path", default="access_log.txt", help="Path to the access log file"

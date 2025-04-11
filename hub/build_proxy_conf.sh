@@ -14,6 +14,8 @@ count=0
 for file in "$PEERS_DIR"/*; do
     if [[ -f "$file" ]]; then
         IP=$(grep -oP 'AllowedIPs = \K[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$file")
+        ENABLED=$(grep -oP 'EnabledForRequests = \K.*' "$file")
+
         if [[ -n "$IP" ]]; then
             if [[ $count -eq 0 ]]; then
                 SERVER_NAME="DefaultServer"
@@ -22,6 +24,7 @@ for file in "$PEERS_DIR"/*; do
             fi
             echo "[$SERVER_NAME]" >> "$OUTPUT_FILE"
             echo "url = http://$IP:$PORT" >> "$OUTPUT_FILE"
+            echo "enabled_for_requests = $ENABLED" >> "$OUTPUT_FILE"
             echo "" >> "$OUTPUT_FILE"
             ((count++))
         fi
