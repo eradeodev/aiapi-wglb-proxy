@@ -52,7 +52,6 @@ def main():
     handler_class.deactivate_security = deactivate_security
 
     httpd = ThreadedHTTPServer(server_address, handler_class)
-    httpd.socket.settimeout
     print(f"Running server on port {args.port}")
 
     try:
