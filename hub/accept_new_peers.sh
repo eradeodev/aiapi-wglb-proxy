@@ -47,14 +47,16 @@ while true; do
         # Parse PublicKey and AllowedIPs from the received file
         PEER_PUB_KEY=$(awk -F'= ' '/^PublicKey/{gsub(/ /, "", $2); print $2}' "$PEER_CONFIG_FILE")
         PEER_ALLOWED_IPS=$(awk -F'= ' '/^AllowedIPs/{gsub(/ /, "", $2); print $2}' "$PEER_CONFIG_FILE")
+        PEER_KEEPALIVE_INTERVAL=$(awk -F'= ' '/^PersistentKeepalive/{gsub(/ /, "", $2); print $2}' "$PEER_CONFIG_FILE")
 
-        if [ -z "$PEER_PUB_KEY" ] || [ -z "$PEER_ALLOWED_IPS" ]; then
-            echo "FAILED: Could not parse PublicKey or AllowedIPs from $PEER_CONFIG_FILE"
+        if [ -z "$PEER_PUB_KEY" ] || [ -z "$PEER_ALLOWED_IPS" ] || [ -z "$PEER_KEEPALIVE_INTERVAL" ]; then
+            echo "FAILED: Could not parse PublicKey or AllowedIPs or PersistentKeepalive from $PEER_CONFIG_FILE"
             rm -f "$PEER_CONFIG_FILE"
         else
             echo "Adding peer $PEER_PUB_KEY with AllowedIPs $PEER_ALLOWED_IPS to hub-wg interface..."
             # Add the peer using wg set
-            if wg set hub-wg peer "$PEER_PUB_KEY" allowed-ips "$PEER_ALLOWED_IPS"; then
+            if wg set hub-wg peer "$PEER_PUB_KEY" allowed-ips "$PEER_ALLOWED_IPS" persistent-keepalive "$PEER_KEEPALIVE_INTERVAL"; then
+                 ip -4 route add "$PEER_ALLOWED_IPS" dev hub-wg
                  echo "Successfully added peer $PEER_PUB_KEY to WireGuard interface."
                  # Rebuild proxy config only after successful peer addition
                  echo "Rebuilding proxy config..."
