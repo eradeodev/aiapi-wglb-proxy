@@ -269,19 +269,22 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
                             # Check against the server's available_models list
                             if model not in updated_models:
-                                ASCIIColors.yellow(f"Model '{model}' not available on server {server_name}. Auto-pulling...")
+                                ASCIIColors.yellow(f"Model '{model}' not available on server {server_name}. Available models were: {updated_models} ... Auto-pulling...")
                                 try:
                                     pull_response = requests.post(
                                         config["url"] + "/api/pull",
                                         json={"model": model},
                                         timeout=proxy_timeout,
                                     )
+                                    ASCIIColors.yellow(f"{server_name} pull response: {pull_response}")
+
                                     pull_response.raise_for_status()
                                     # Re-query the available models after pulling
                                     updated_models = self.get_server_available_models(server_name, config["url"])
+                                    ASCIIColors.yellow(f"Model '{model}' still not available on server {server_name} after pull. Available models were: {updated_models}")
                                     config["available_models"] = updated_models
                                     if model not in updated_models:
-                                        ASCIIColors.red(f"Model '{model}' still not available after pull on server {server_name}.")
+                                        ASCIIColors.red(f"Model '{model}' still not available after pull on server {server_name}. Trying next server.")
                                         # Continue to next server if pull did not update available models.
                                         continue
                                     else:
