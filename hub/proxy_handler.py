@@ -280,6 +280,12 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                             # If no exact match, try substring (fuzzy) match
                             if not matched_model:
                                 matched_model = next((m for m in updated_models if normalized_model in self._normalize_model_name(m)), None)
+                            # Assign model if matched:
+                            if matched_model:
+                                model = matched_model
+                                # Update the model in post_data_dict and re-encode
+                                post_data_dict["model"] = model
+                                post_data = json.dumps(post_data_dict).encode("utf-8")
 
                             if not matched_model:
                                 ASCIIColors.yellow(f"Model '{model}' not available on server {server_name}. Available models were: {updated_models} ... Auto-pulling...")
@@ -302,12 +308,13 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                                         continue
                                     else:
                                         ASCIIColors.yellow(f"Successfully pulled model '{model}' on server {server_name}.")
+                                        # Update the model in post_data_dict and re-encode after successful pull
+                                        post_data_dict["model"] = model
+                                        post_data = json.dumps(post_data_dict).encode("utf-8")
                                 except Exception as pull_exception:
                                     ASCIIColors.red(f"Failed to auto-pull model '{model}' on server {server_name}: {pull_exception}")
                                     # If pull fails, try the next available server.
                                     continue
-                            else:
-                                model = matched_model
 
                         load_tracker = config["queue"]
                         self.request_logger.log(
