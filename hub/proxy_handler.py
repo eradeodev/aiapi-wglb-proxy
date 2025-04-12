@@ -594,8 +594,12 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                  ASCIIColors.yellow(f"No reachable servers available on attempt {attempt}. request_uuid = {self.request_uuid}")
                  break # Exit retry loop if no servers left
             
-            sorted_names = [s[0] for s in current_servers]
-            ASCIIColors.magenta(f"Reachable servers sorted by queue + last_processed_time: {sorted_names} request_uuid = {self.request_uuid}")
+            for s in current_servers:
+                name = s[0]
+                qsize = s[1]["queue"].qsize()
+                last_time = s[1]["last_processed_time"]
+                ASCIIColors.magenta(f"Server {name}: queue size = {qsize}, last_processed_time = {last_time} request_uuid = {self.request_uuid}")
+
 
             num_servers = len(current_servers)
             start_index = (attempt - 1) % num_servers
@@ -604,7 +608,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 server_index = (start_index + i) % num_servers
                 server_info = current_servers[server_index] # Use current list
                 server_name, config = server_info
-
+                ASCIIColors.magenta(f"Iterating over servers: server {server_name} - i={i} - server_index={server_index} - request_uuid = {self.request_uuid}")
                 if server_name in tried_servers_overall and num_servers > 1:
                      continue # Try next server in this attempt first
 
