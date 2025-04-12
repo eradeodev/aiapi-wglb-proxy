@@ -589,10 +589,13 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
         while attempt < _MAX_RETRIES:
             attempt += 1
-            current_servers = self.get_reachable_servers(path) # Re-check reachability each attempt? Or use initial list? Let's use initial for now.
+            current_servers = self.get_reachable_servers(path)
             if not current_servers: # Use current_servers instead of reachable_servers if re-checking
                  ASCIIColors.yellow(f"No reachable servers available on attempt {attempt}. request_uuid = {self.request_uuid}")
                  break # Exit retry loop if no servers left
+            
+            sorted_names = [s[0] for s in current_servers]
+            ASCIIColors.magenta(f"Reachable servers sorted by queue + last_processed_time: {sorted_names} request_uuid = {self.request_uuid}")
 
             num_servers = len(current_servers)
             start_index = (attempt - 1) % num_servers
