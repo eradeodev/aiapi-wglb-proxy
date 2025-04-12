@@ -45,7 +45,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 if self._is_server_reachable(server_name, config["url"]):
                     enabled = config.get("enabled_for_requests", [])
                     ASCIIColors.yellow(
-                        f"Server {server_name} enabled_for_requests = {enabled}"
+                        f"Server {server_name} enabled_for_requests = {enabled} request_uuid = {self.request_uuid}"
                     )
                     if not enabled or path in enabled:
                         available_models = self.get_server_available_models(server_name, config["url"])
@@ -53,7 +53,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                         reachable.append(server)
             except Exception as e:
                 ASCIIColors.yellow(
-                    f"Server {server_name} unreachable: {str(e)}"
+                    f"Server {server_name} unreachable: {str(e)} request_uuid = {self.request_uuid}"
                 )
         return sorted(
             reachable,
@@ -94,7 +94,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             self.config_manager.update_server_available_models(server_name, available_models)
             return available_models
         except Exception as e:
-            ASCIIColors.yellow(f"Failed retrieving models for server {server_name}: {e}")
+            ASCIIColors.yellow(f"Failed retrieving models for server {server_name}: {e} request_uuid = {self.request_uuid}")
             # Log failure
             self.request_logger.log(
                 event="retrieving_models_failed",
@@ -119,7 +119,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 return True
             except Exception as e:
                 ASCIIColors.yellow(
-                    f"Server {server_name} ({host}:{port}) unreachable: {str(e)}"
+                    f"Server {server_name} ({host}:{port}) unreachable: {str(e)} request_uuid = {self.request_uuid}"
                 )
                 return False
 
@@ -164,7 +164,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             pass
         except Exception as e:
              # Log error during response writing if needed
-             ASCIIColors.red(f"Error writing response body: {e}")
+             ASCIIColors.red(f"Error writing response body: {e} request_uuid = {self.request_uuid}")
              self._log_request_outcome(
                  event="response_write_error",
                  server_name=getattr(self, "active_server_name", "unset_server"),
@@ -223,7 +223,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             if authorized:
                 return True
             else:
-                ASCIIColors.red(f"User '{user}' is not authorized")
+                ASCIIColors.red(f"User '{user}' is not authorized. request_uuid = {self.request_uuid}")
                 # --- Logging kept manual due to early exit context, include request_uuid ---
                 self.request_logger.log(
                     event="rejected",
@@ -317,7 +317,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 post_data_str = post_data.decode("utf-8")
                 return json.loads(post_data_str)
             except (UnicodeDecodeError, json.JSONDecodeError) as e:
-                ASCIIColors.yellow(f"Could not decode post data as JSON: {e}")
+                ASCIIColors.yellow(f"Could not decode post data as JSON: {e} - request_uuid = {self.request_uuid}")
                 return {}
         if isinstance(post_data, dict):
             return post_data
@@ -327,9 +327,9 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             try:
                 return json.loads(post_data)
             except json.JSONDecodeError:
-                ASCIIColors.yellow("Could not decode string post data as JSON.")
+                ASCIIColors.yellow(f"Could not decode string post data as JSON: {post_data} - request_uuid = {self.request_uuid}")
                 return {}
-        ASCIIColors.yellow(f"Unexpected post_data type: {type(post_data)}")
+        ASCIIColors.yellow(f"Unexpected post_data type: {type(post_data)} - request_uuid = {self.request_uuid}")
         return {}
 
     def _handle_model_check_and_pull(self, server_name, config, post_data):
@@ -351,13 +351,13 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             matched_model = self.match_model(model, available_models)
 
             if matched_model:
-                ASCIIColors.yellow(f"{server_name} found matched model for '{model}': '{matched_model}'")
+                ASCIIColors.yellow(f"{server_name} found matched model for '{model}': '{matched_model}' - request_uuid = {self.request_uuid}")
                 if model != matched_model:
                     post_data_dict["model"] = matched_model
                     return json.dumps(post_data_dict).encode("utf-8")
                 return post_data # Exact or already matched
 
-            ASCIIColors.yellow(f"Model '{model}' not on {server_name}. Available: {available_models}. Auto-pulling...")
+            ASCIIColors.yellow(f"Model '{model}' not on {server_name}. Available: {available_models}. Auto-pulling... request_uuid = {self.request_uuid}")
             # Log the pull attempt
             self.request_logger.log(
                 event="model_pull_attempt",
@@ -371,7 +371,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 json={"model": model},
                 timeout=_PROXY_TIMEOUT,
             )
-            ASCIIColors.yellow(f"{server_name} pull response: {pull_response.status_code} - {pull_response.text[:200]}...")
+            ASCIIColors.yellow(f"{server_name} pull response: {pull_response.status_code} - {pull_response.text[:200]}... request_uuid = {self.request_uuid}")
             # Log pull response
             self.request_logger.log(
                 event="model_pull_response",
@@ -389,15 +389,15 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             matched_model = self.match_model(model, available_models)
 
             if matched_model:
-                ASCIIColors.green(f"Successfully pulled and matched model '{model}' ({matched_model}) on {server_name}.")
+                ASCIIColors.green(f"Successfully pulled and matched model '{model}' ({matched_model}) on {server_name}. request_uuid = {self.request_uuid}")
                 post_data_dict["model"] = matched_model
                 return json.dumps(post_data_dict).encode("utf-8")
             else:
-                ASCIIColors.red(f"Model '{model}' still not available after pull on {server_name}. Available: {available_models}.")
+                ASCIIColors.red(f"Model '{model}' still not available after pull on {server_name}. Available: {available_models}. request_uuid = {self.request_uuid}")
                 return None # Signal failure
 
         except Exception as e:
-            ASCIIColors.red(f"Failed during model check/pull for '{model}' on {server_name}: {e}")
+            ASCIIColors.red(f"Failed during model check/pull for '{model}' on {server_name}: {e} - request_uuid = {self.request_uuid}")
             # Log the failure
             self.request_logger.log(
                 event="model_check_pull_error",
@@ -475,7 +475,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
         except requests.exceptions.ConnectionError as e:
             error = e
-            ASCIIColors.yellow(f"Could not connect to server {server_name}: {e}")
+            ASCIIColors.yellow(f"Could not connect to server {server_name}: {e} - request_uuid = {self.request_uuid}")
             self._log_request_outcome("connection_error", server_name, path, get_params, current_post_data, client_ip, start_time, error=error, queue_size=queue_size, request_uuid=self.request_uuid)
 
         except requests.exceptions.RequestException as e:
@@ -485,7 +485,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
         except Exception as e:
             error = e
-            ASCIIColors.yellow(f"An unexpected error occurred while routing to {server_name}: {e}")
+            ASCIIColors.yellow(f"An unexpected error occurred while routing to {server_name}: {e} - request_uuid = {self.request_uuid}")
             self._log_request_outcome("routing_error", server_name, path, get_params, current_post_data, client_ip, start_time, error=error, queue_size=queue_size, request_uuid=self.request_uuid)
 
         # 5. Finalize attempt
@@ -495,13 +495,13 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 try:
                     load_tracker.get_nowait()
                 except Exception as q_e:
-                    ASCIIColors.red(f"Error updating queue count for {server_name}: {q_e}")
+                    ASCIIColors.red(f"Error updating queue count for {server_name}: {q_e} - request_uuid = {self.request_uuid}")
 
         return request_handled
 
     def _handle_pull_broadcast(self, path, get_params, post_data, reachable_servers, client_ip):
         """Handles /api/pull by broadcasting."""
-        ASCIIColors.magenta(f"Broadcasting /api/pull request to {len(reachable_servers)} servers.")
+        ASCIIColors.magenta(f"Broadcasting /api/pull request to {len(reachable_servers)} servers. request_uuid = {self.request_uuid}")
         first_response_sent = False
         overall_start_time = time.time() # For final log if needed
 
@@ -531,25 +531,25 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
                     except requests.exceptions.HTTPError as http_err:
                         # Log the error for this server even if we don't send it back yet
-                        ASCIIColors.yellow(f"Pull HTTP error from {server_name} (not sent to client unless first): {http_err}")
+                        ASCIIColors.yellow(f"Pull HTTP error from {server_name} (not sent to client unless first): {http_err} - request_uuid = {self.request_uuid}")
                         # Log separately that this specific server failed, but wasn't the primary failure yet
                         self._log_request_outcome("pull_attempt_fail", server_name, path, get_params, post_data, client_ip, start_time, response=response, error=http_err, request_uuid=self.request_uuid)
 
             except requests.exceptions.RequestException as e:
                 error = e
                 response = getattr(e, 'response', None)
-                ASCIIColors.yellow(f"Error pulling from {server_name}: {e}")
+                ASCIIColors.yellow(f"Error pulling from {server_name}: {e} - request_uuid = {self.request_uuid}")
                 self._log_request_outcome("pull_error", server_name, path, get_params, post_data, client_ip, start_time, response=response, error=error, request_uuid=self.request_uuid)
             except Exception as e:
                 error = e
-                ASCIIColors.red(f"Unexpected error during pull broadcast to {server_name}: {e}")
+                ASCIIColors.red(f"Unexpected error during pull broadcast to {server_name}: {e} - request_uuid = {self.request_uuid}")
                 self._log_request_outcome("pull_error", server_name, path, get_params, post_data, client_ip, start_time, error=f"Broadcast loop error: {e}", request_uuid=self.request_uuid)
             finally:
                 self.config_manager.update_server_process_time(server_name)
 
 
         if not first_response_sent:
-            error_message = "Pull request broadcast failed or returned errors on all reachable servers."
+            error_message = f"Pull request broadcast failed or returned errors on all reachable servers. request_uuid = {self.request_uuid}"
             ASCIIColors.red(error_message)
             self._send_response_code(503, error_message)
             self.end_headers()
@@ -591,7 +591,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             attempt += 1
             current_servers = self.get_reachable_servers(path) # Re-check reachability each attempt? Or use initial list? Let's use initial for now.
             if not current_servers: # Use current_servers instead of reachable_servers if re-checking
-                 ASCIIColors.yellow(f"No reachable servers available on attempt {attempt}.")
+                 ASCIIColors.yellow(f"No reachable servers available on attempt {attempt}. request_uuid = {self.request_uuid}")
                  break # Exit retry loop if no servers left
 
             num_servers = len(current_servers)
@@ -607,22 +607,22 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
                 tried_servers_overall.add(server_name)
                 # active_server context is set within _attempt_request_on_server on success
-                ASCIIColors.cyan(f"Attempt {attempt}/{_MAX_RETRIES}: Trying server '{server_name}' for path '{path}'...")
+                ASCIIColors.cyan(f"Attempt {attempt}/{_MAX_RETRIES}: Trying server '{server_name}' for path '{path}'... request_uuid = {self.request_uuid}")
                 request_handled = self._attempt_request_on_server(
                     server_name, config, path, get_params, post_data, client_ip
                 )
 
                 if request_handled:
-                    ASCIIColors.green(f"{path} request successfully handled by server '{server_name}'.")
+                    ASCIIColors.green(f"{path} request successfully handled by server '{server_name}'. request_uuid = {self.request_uuid}")
                     # Success logged within _attempt_request_on_server
                     return # Exit routing function
 
-                ASCIIColors.yellow(f"{path} request attempt on server '{server_name}' failed. Trying next available server or retrying...")
+                ASCIIColors.yellow(f"{path} request attempt on server '{server_name}' failed. Trying next available server or retrying... request_uuid = {self.request_uuid}")
                 # Loop continues
 
         # If loop completes without returning, all attempts failed
         all_tried_servers_str = ', '.join(sorted(list(tried_servers_overall)))
-        retry_failed_message = f"Failed to process {path} request on any reachable server after {_MAX_RETRIES} attempts. Tried: [{all_tried_servers_str}]"
+        retry_failed_message = f"Failed to process {path} request on any reachable server after {_MAX_RETRIES} attempts. Tried: [{all_tried_servers_str}] - request_uuid = {self.request_uuid}"
         ASCIIColors.red(retry_failed_message)
 
         # --- Use _log_request_outcome for final routing failure ---
@@ -668,7 +668,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             reachable_servers = self.get_reachable_servers(self.request_path)
 
             if not reachable_servers:
-                not_available_message = f"No reachable Ollama servers available to handle {self.request_path}."
+                not_available_message = f"No reachable Ollama servers available to handle {self.request_path}. request_uuid = {self.request_uuid}"
                 self._send_response_code(503, not_available_message)
                 self.end_headers()
                 ASCIIColors.red(not_available_message)
@@ -700,14 +700,14 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
         except Exception as e:
             # Catch-all for unexpected errors during request handling (after security/parsing)
-            ASCIIColors.red(f"An unexpected error occurred while handling the request: {e}")
+            ASCIIColors.red(f"An unexpected error occurred while handling the request: {e} - request_uuid = {self.request_uuid}")
             traceback.print_exc()
             try:
                 # Attempt to send 500
                 self._send_response_code(500, "Internal Server Error") # Uses self.request_uuid
                 self.end_headers()
             except Exception as send_err:
-                ASCIIColors.red(f"Failed to send error response to client: {send_err}")
+                ASCIIColors.red(f"Failed to send error response to client: {send_err} - request_uuid = {self.request_uuid}")
 
             # --- Use _log_request_outcome for unexpected errors ---
             self._log_request_outcome(
