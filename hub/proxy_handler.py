@@ -1,3 +1,4 @@
+import http.server
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import requests
@@ -6,6 +7,7 @@ import socket
 import time
 from ascii_colors import ASCIIColors
 import traceback
+import uuid
 
 _GENERATE_PATHS = {"/api/generate", "/api/embed", "/api/chat", "/v1/chat/completions"}
 _PROXY_TIMEOUT = (60, 3600)  # (connect timeout, read timeout)
@@ -24,7 +26,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
     user = 'unknown' # Initialize user
     active_server_name = 'unset_server'
     active_server_queue_size = -1
-
+    request_uuid = None # Initialize request_uuid
 
     def _normalize_model_name(self, name):
         """Removes ':latest' suffix from a model name if present."""
@@ -60,7 +62,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
     def get_server_available_models(self, server_name, server_url):
         """Queries the server for its available models via a GET request to /api/tags."""
-        # --- Logging kept manual as it's an internal task ---
         self.request_logger.log(
             event="retrieving_models",
             user="proxy_server",
@@ -70,6 +71,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             nb_queued_requests_on_server=-1,
             response_status=0,
             message="Getting available models from server",
+            request_uuid=self.request_uuid 
         )
         try:
             response = requests.get(f"{server_url}/api/tags", timeout=10)
@@ -87,11 +89,22 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 nb_queued_requests_on_server=-1,
                 response_status=0,
                 message=f"Retrieved these models from {server_name}: {available_models}",
+                request_uuid=self.request_uuid 
             )
             self.config_manager.update_server_available_models(server_name, available_models)
             return available_models
         except Exception as e:
             ASCIIColors.yellow(f"Failed retrieving models for server {server_name}: {e}")
+            # Log failure
+            self.request_logger.log(
+                event="retrieving_models_failed",
+                user="proxy_server",
+                ip_address=self.client_address[0],
+                access="Authorized",
+                server=server_name,
+                error=f"Failed retrieving models: {e}",
+                request_uuid=self.request_uuid 
+            )
             return []
 
     def _is_server_reachable(self, server_name, server_url):
@@ -126,6 +139,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             response_status=response_code,
             message=message,
             request_path=getattr(self, 'request_path', self.path), # Try to get path if available
+            request_uuid=self.request_uuid 
         )
         self.send_response(response_code, message)
 
@@ -162,7 +176,8 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                  response=response, # Pass the original response
                  error=f"Error writing response body: {e}",
                  queue_size=getattr(self, 'active_server_queue_size', -1),
-                 access="Authorized" if getattr(self, 'user', 'unknown') != 'unknown' else 'Denied' # Use established access
+                 access="Authorized" if getattr(self, 'user', 'unknown') != 'unknown' else 'Denied', # Use established access
+                 request_uuid=self.request_uuid 
              )
 
     def log_message(self, format, *args):
@@ -209,7 +224,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 return True
             else:
                 ASCIIColors.red(f"User '{user}' is not authorized")
-                # --- Logging kept manual due to early exit context ---
+                # --- Logging kept manual due to early exit context, include request_uuid ---
                 self.request_logger.log(
                     event="rejected",
                     user=user,
@@ -218,7 +233,8 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                     server="None",
                     nb_queued_requests_on_server=-1,
                     error="Authentication failed",
-                    request_path=urlparse(self.path).path # Get path for context
+                    request_path=urlparse(self.path).path, # Get path for context
+                    request_uuid=self.request_uuid 
                 )
                 self._send_response_code(403, f"User '{user}' is not authorized")
                 self.end_headers()
@@ -253,7 +269,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
     def _log_request_outcome(self, event, server_name, path, get_params, post_data,
                          client_ip, start_time, response=None, error=None,
-                         queue_size=-1, access="Authorized"):
+                         queue_size=-1, access="Authorized", request_uuid=None):
         """Centralized logging for request outcomes."""
         duration = time.time() - start_time if start_time else None
         post_body_str = post_data.decode('utf-8', errors='ignore') if isinstance(post_data, bytes) else str(post_data)
@@ -270,7 +286,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             log_data["access"] = access
         if server_name:
             log_data["server"] = server_name
-        if queue_size and queue_size != -1:
+        if queue_size is not None and queue_size != -1:
             log_data["nb_queued_requests_on_server"] = queue_size
         if path:
             log_data["request_path"] = path
@@ -289,6 +305,8 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                     log_data["response_status"] = error.response.status_code
             else:
                 log_data["error"] = str(error)
+        if request_uuid:
+             log_data["request_uuid"] = request_uuid
 
         self.request_logger.log(**log_data)
 
@@ -340,14 +358,32 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 return post_data # Exact or already matched
 
             ASCIIColors.yellow(f"Model '{model}' not on {server_name}. Available: {available_models}. Auto-pulling...")
+            # Log the pull attempt
+            self.request_logger.log(
+                event="model_pull_attempt",
+                server=server_name,
+                model=model,
+                message=f"Attempting pull for model {model}",
+                request_uuid=self.request_uuid
+            )
             pull_response = requests.post(
                 f"{server_url}/api/pull",
                 json={"model": model},
                 timeout=_PROXY_TIMEOUT,
             )
             ASCIIColors.yellow(f"{server_name} pull response: {pull_response.status_code} - {pull_response.text[:200]}...")
+            # Log pull response
+            self.request_logger.log(
+                event="model_pull_response",
+                server=server_name,
+                model=model,
+                response_status=pull_response.status_code,
+                message=f"Pull response received for model {model}",
+                request_uuid=self.request_uuid
+            )
             pull_response.raise_for_status()
 
+            # Re-check models after pull
             available_models = self.get_server_available_models(server_name, server_url)
             config["available_models"] = available_models
             matched_model = self.match_model(model, available_models)
@@ -362,12 +398,20 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
         except Exception as e:
             ASCIIColors.red(f"Failed during model check/pull for '{model}' on {server_name}: {e}")
+            # Log the failure
+            self.request_logger.log(
+                event="model_check_pull_error",
+                server=server_name,
+                model=model,
+                error=str(e),
+                message="Error during model check or pull",
+                request_uuid=self.request_uuid
+            )
             return None # Signal failure
 
     def _attempt_request_on_server(self, server_name, config, path, get_params, post_data, client_ip):
         """
         Attempts a single request to a specific server. Returns True if handled, False if retry needed.
-        Uses _log_request_outcome for logging results.
         """
         start_time = time.time()
         load_tracker = config.get("queue")
@@ -382,7 +426,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             updated_post_data = self._handle_model_check_and_pull(server_name, config, current_post_data)
             if updated_post_data is None:
                 self.config_manager.update_server_process_time(server_name)
-                self._log_request_outcome("model_pull_fail", server_name, path, get_params, post_data, client_ip, start_time, error="Model check/pull failed", queue_size=queue_size)
+                self._log_request_outcome("model_pull_fail", server_name, path, get_params, post_data, client_ip, start_time, error="Model check/pull failed", queue_size=queue_size, request_uuid=self.request_uuid)
                 return False # Signal failure, try next server
             current_post_data = updated_post_data # Use potentially updated data
             post_data_dict = self._decode_post_data(current_post_data) # Decode again if updated
@@ -390,7 +434,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         # 2. Log initial attempt (if applicable) and prepare request
         if is_generate_path and load_tracker:
             # Log the *actual* post data being sent (potentially updated)
-            self._log_request_outcome(f"{log_event_prefix}_request", server_name, path, get_params, current_post_data, client_ip, None, queue_size=queue_size)
+            self._log_request_outcome(f"{log_event_prefix}_request", server_name, path, get_params, current_post_data, client_ip, None, queue_size=queue_size, request_uuid=self.request_uuid)
             load_tracker.put_nowait(1)
 
         response = None
@@ -414,7 +458,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             self._send_response(response) # Send response
             self.active_server_name = server_name # Record successful server
             self.active_server_queue_size = queue_size # Record queue size at time of success
-            self._log_request_outcome(f"{log_event_prefix}_done", server_name, path, get_params, current_post_data, client_ip, start_time, response=response, queue_size=queue_size)
+            self._log_request_outcome(f"{log_event_prefix}_done", server_name, path, get_params, current_post_data, client_ip, start_time, response=response, queue_size=queue_size, request_uuid=self.request_uuid)
             request_handled = True
 
         # 4. Handle specific exceptions
@@ -422,7 +466,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             error = e
             response = e.response
             # Log using current_post_data for accuracy
-            self._log_request_outcome(f"{log_event_prefix}_error", server_name, path, get_params, current_post_data, client_ip, start_time, response=response, error=error, queue_size=queue_size)
+            self._log_request_outcome(f"{log_event_prefix}_error", server_name, path, get_params, current_post_data, client_ip, start_time, response=response, error=error, queue_size=queue_size, request_uuid=self.request_uuid)
             if 400 <= response.status_code < 500:
                 error_message = f"{log_event_prefix.capitalize()} request handling failed on {server_name}." # Simpler message
                 self._send_response(response, error_message) # Send actual error response
@@ -432,17 +476,17 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         except requests.exceptions.ConnectionError as e:
             error = e
             ASCIIColors.yellow(f"Could not connect to server {server_name}: {e}")
-            self._log_request_outcome("connection_error", server_name, path, get_params, current_post_data, client_ip, start_time, error=error, queue_size=queue_size)
+            self._log_request_outcome("connection_error", server_name, path, get_params, current_post_data, client_ip, start_time, error=error, queue_size=queue_size, request_uuid=self.request_uuid)
 
         except requests.exceptions.RequestException as e:
             error = e
             response = getattr(e, 'response', None)
-            self._log_request_outcome(f"{log_event_prefix}_error", server_name, path, get_params, current_post_data, client_ip, start_time, response=response, error=error, queue_size=queue_size)
+            self._log_request_outcome(f"{log_event_prefix}_error", server_name, path, get_params, current_post_data, client_ip, start_time, response=response, error=error, queue_size=queue_size, request_uuid=self.request_uuid)
 
         except Exception as e:
             error = e
             ASCIIColors.yellow(f"An unexpected error occurred while routing to {server_name}: {e}")
-            self._log_request_outcome("routing_error", server_name, path, get_params, current_post_data, client_ip, start_time, error=error, queue_size=queue_size)
+            self._log_request_outcome("routing_error", server_name, path, get_params, current_post_data, client_ip, start_time, error=error, queue_size=queue_size, request_uuid=self.request_uuid)
 
         # 5. Finalize attempt
         finally:
@@ -456,7 +500,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         return request_handled
 
     def _handle_pull_broadcast(self, path, get_params, post_data, reachable_servers, client_ip):
-        """Handles /api/pull by broadcasting. Uses _log_request_outcome."""
+        """Handles /api/pull by broadcasting."""
         ASCIIColors.magenta(f"Broadcasting /api/pull request to {len(reachable_servers)} servers.")
         first_response_sent = False
         overall_start_time = time.time() # For final log if needed
@@ -474,7 +518,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                     timeout=_PROXY_TIMEOUT,
                 )
                 # Log immediately, check status before sending
-                self._log_request_outcome("pull_attempt_done", server_name, path, get_params, post_data, client_ip, start_time, response=response)
+                self._log_request_outcome("pull_attempt_done", server_name, path, get_params, post_data, client_ip, start_time, response=response, request_uuid=self.request_uuid)
 
                 if not first_response_sent:
                     try:
@@ -483,23 +527,23 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                         first_response_sent = True
                         self.active_server_name = server_name # Mark which server gave the primary response
                         # Log that this was the primary success
-                        self._log_request_outcome("pull_primary_success", server_name, path, get_params, post_data, client_ip, start_time, response=response)
+                        self._log_request_outcome("pull_primary_success", server_name, path, get_params, post_data, client_ip, start_time, response=response, request_uuid=self.request_uuid)
 
                     except requests.exceptions.HTTPError as http_err:
                         # Log the error for this server even if we don't send it back yet
                         ASCIIColors.yellow(f"Pull HTTP error from {server_name} (not sent to client unless first): {http_err}")
                         # Log separately that this specific server failed, but wasn't the primary failure yet
-                        self._log_request_outcome("pull_attempt_fail", server_name, path, get_params, post_data, client_ip, start_time, response=response, error=http_err)
+                        self._log_request_outcome("pull_attempt_fail", server_name, path, get_params, post_data, client_ip, start_time, response=response, error=http_err, request_uuid=self.request_uuid)
 
             except requests.exceptions.RequestException as e:
                 error = e
                 response = getattr(e, 'response', None)
                 ASCIIColors.yellow(f"Error pulling from {server_name}: {e}")
-                self._log_request_outcome("pull_error", server_name, path, get_params, post_data, client_ip, start_time, response=response, error=error)
+                self._log_request_outcome("pull_error", server_name, path, get_params, post_data, client_ip, start_time, response=response, error=error, request_uuid=self.request_uuid)
             except Exception as e:
                 error = e
                 ASCIIColors.red(f"Unexpected error during pull broadcast to {server_name}: {e}")
-                self._log_request_outcome("pull_error", server_name, path, get_params, post_data, client_ip, start_time, error=f"Broadcast loop error: {e}")
+                self._log_request_outcome("pull_error", server_name, path, get_params, post_data, client_ip, start_time, error=f"Broadcast loop error: {e}", request_uuid=self.request_uuid)
             finally:
                 self.config_manager.update_server_process_time(server_name)
 
@@ -519,7 +563,8 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 client_ip=client_ip,
                 start_time=overall_start_time, # Log duration of whole broadcast attempt
                 error=error_message,
-                access="Denied" # Denied because no server could fulfill it
+                access="Denied", # Denied because no server could fulfill it
+                request_uuid=self.request_uuid
             )
         # Indicate the /api/pull path has been fully handled here
         return True # Signal handled regardless of success/fail
@@ -529,13 +574,11 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
     def _route_request(self, path, get_params, post_data, reachable_servers):
         """
         Routes the request to a proxy server with retries.
-        Uses _log_request_outcome for final failure logging.
         """
         client_ip, _ = self.client_address
 
         # Handle /api/pull broadcast separately
         if path == "/api/pull":
-            # Pass instance attributes for consistency if needed, though pull doesn't use them internally much
             self._handle_pull_broadcast(self.request_path, self.request_get_params, self.request_post_data, reachable_servers, client_ip)
             return
 
@@ -560,18 +603,11 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 server_name, config = server_info
 
                 if server_name in tried_servers_overall and num_servers > 1:
-                     # Simple optimization: If we already tried this server in a *previous* full attempt,
-                     # and there are other servers available in *this* attempt's list, skip it for now.
-                     # This helps prevent immediately retrying a known-bad server if others exist.
-                     # Note: Doesn't prevent trying it again if it's the *only* one left or in a later attempt.
-                     # ASCIIColors.grey(f"Attempt {attempt}: Skipping server '{server_name}' (already tried in previous attempt).")
                      continue # Try next server in this attempt first
 
                 tried_servers_overall.add(server_name)
                 # active_server context is set within _attempt_request_on_server on success
-
                 ASCIIColors.cyan(f"Attempt {attempt}/{_MAX_RETRIES}: Trying server '{server_name}' for path '{path}'...")
-
                 request_handled = self._attempt_request_on_server(
                     server_name, config, path, get_params, post_data, client_ip
                 )
@@ -581,7 +617,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                     # Success logged within _attempt_request_on_server
                     return # Exit routing function
 
-                # If request_handled is False, log attempt failure and continue loop
                 ASCIIColors.yellow(f"{path} request attempt on server '{server_name}' failed. Trying next available server or retrying...")
                 # Loop continues
 
@@ -600,7 +635,8 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             client_ip=client_ip,
             start_time=overall_start_time, # Log duration for the entire routing attempt
             error=retry_failed_message,
-            access="Denied" # Ultimately denied access to service
+            access="Denied", # Ultimately denied access to service
+            request_uuid=self.request_uuid 
         )
 
         # Send 503 Service Unavailable
@@ -609,7 +645,10 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
 
     def _handle_request(self):
-        """Main handler for incoming requests."""
+        """Main handler for incoming requests. Generates request_uuid."""
+        # Generate a unique ID for this request AT THE VERY BEGINNING
+        self.request_uuid = str(uuid.uuid4())
+
         start_time = time.time()
         client_ip, _ = self.client_address
         access_status = "Denied" # Default access status for logging
@@ -617,7 +656,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         try:
             # Security check - sets self.user and potentially exits
             if not self._handle_security():
-                # Logging is handled within _handle_security for rejection
                 return # Exit if security failed
 
             # If security passed
@@ -646,7 +684,8 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                     request_path=self.request_path,
                     request_params=self.request_get_params,
                     request_body=self.request_post_data.decode('utf-8', errors='ignore') if isinstance(self.request_post_data, bytes) else str(self.request_post_data),
-                    duration = time.time() - start_time # Log duration up to this point
+                    duration = time.time() - start_time, # Log duration up to this point
+                    request_uuid=self.request_uuid
                 )
                 return
 
@@ -665,7 +704,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             traceback.print_exc()
             try:
                 # Attempt to send 500
-                self._send_response_code(500, "Internal Server Error")
+                self._send_response_code(500, "Internal Server Error") # Uses self.request_uuid
                 self.end_headers()
             except Exception as send_err:
                 ASCIIColors.red(f"Failed to send error response to client: {send_err}")
@@ -681,5 +720,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 start_time=start_time, # Log duration until error
                 error=f"Unexpected handler error: {e}",
                 queue_size=getattr(self, 'active_server_queue_size', -1),
-                access=access_status # Log access status determined earlier
+                access=access_status, # Log access status determined earlier
+                request_uuid=self.request_uuid 
             )
