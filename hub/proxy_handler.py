@@ -175,7 +175,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         servers = self.config_manager.get_servers()
         current_time = time.time()
 
-        for server_name, config in servers.items(): # Iterate directly over items
+        for server_name, config in servers:
             try:
                 # Initialize backoff fields if they don't exist
                 config.setdefault('last_post_verify_fail_time', 0)
