@@ -23,7 +23,6 @@ COPY access_log_rotate.conf /etc/logrotate.d/access_log
 # Set up cron job to run every hour
 RUN echo "0 * * * * /usr/sbin/logrotate -f /etc/logrotate.d/access_log" > /etc/cron.d/logrotate_hourly && chmod 0644 /etc/cron.d/logrotate_hourly && crontab /etc/cron.d/logrotate_hourly
 
-
 # Copy everything from the current directory into the container
 COPY accept_new_peers.sh /app
 COPY build_wg_config.sh /app
@@ -34,6 +33,15 @@ COPY startup.sh /app
 COPY build_proxy_conf.sh /app
 COPY authorized_users.txt /app
 COPY prune_old_peers.sh /app
+
+
+# Configure bash history
+RUN { \
+    grep -qxF 'export HISTFILESIZE=2000' /etc/bashrc || echo 'export HISTFILESIZE=2000' >> /etc/bashrc; \
+    grep -qxF 'export HISTSIZE=1000' /etc/bashrc || echo 'export HISTSIZE=1000' >> /etc/bashrc; \
+    grep -qxF 'export HISTFILE=~/.bash_history' /etc/bashrc || echo 'export HISTFILE=~/.bash_history' >> /etc/bashrc; \
+    grep -qxF 'PROMPT_COMMAND="history -a; $PROMPT_COMMAND"' /etc/bashrc || echo 'PROMPT_COMMAND="history -a; $PROMPT_COMMAND"' >> /etc/bashrc; \
+}
 
 # Default command
 WORKDIR /app
