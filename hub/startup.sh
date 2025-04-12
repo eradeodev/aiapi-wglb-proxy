@@ -24,23 +24,16 @@ echo "Starting wireguard"
 echo "Accepting new peers"
 ./accept_new_peers.sh &
 
-# Start cron service
-service cron start
+# Ensure prune script is executable
+chmod +x /app/prune_old_peers.sh
 
-# Register peer pruner in cron job
-SCRIPT_PATH="/app/prune_old_peers.sh"
-CRON_JOB="* * * * * $SCRIPT_PATH >> /proc/1/fd/1 2>> /proc/1/fd/2"
+# Add peer pruning cron job
+echo "* * * * * /app/prune_old_peers.sh >> /proc/1/fd/1 2>> /proc/1/fd/2" > /etc/cron.d/peer_prune
+chmod 0644 /etc/cron.d/peer_prune
 
-# Ensure the script is executable
-chmod +x "$SCRIPT_PATH"
-
-# Check if the cron job already exists
-if (crontab -l 2>/dev/null | grep -F "$SCRIPT_PATH") ; then
-    echo "Cron job already exists."
-else
-    (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
-    echo "Cron job added: $CRON_JOB"
-fi
+# Start cron
+echo "Starting cron"
+cron
 
 
 # Start load balancer in a loop; if this script does exit, Docker should restart it due to restart=always:

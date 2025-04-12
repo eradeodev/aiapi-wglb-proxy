@@ -2,7 +2,7 @@ FROM python:3.11.11-slim-bookworm
 
 # Install WireGuard tools
 RUN apt-get update && \
-    apt-get install -y wireguard-tools iproute2 netcat-openbsd iputils-ping curl git apache2 cron && \
+    apt-get install -y wireguard-tools iproute2 netcat-openbsd iputils-ping curl git apache2 cron logrotate && \
     rm -rf /var/lib/apt/lists/* 
 
 # Set the working directory
@@ -16,6 +16,13 @@ COPY ascii_colors.py .
 COPY config_manager.py .
 COPY logger.py .
 COPY proxy_handler.py .
+
+# Copy custom logrotate config
+COPY access_log_rotate.conf /etc/logrotate.d/access_log
+
+# Set up cron job to run every hour
+RUN echo "0 * * * * /usr/sbin/logrotate -f /etc/logrotate.d/access_log" > /etc/cron.d/logrotate_hourly && chmod 0644 /etc/cron.d/logrotate_hourly && crontab /etc/cron.d/logrotate_hourly
+
 
 # Copy everything from the current directory into the container
 COPY accept_new_peers.sh /app
