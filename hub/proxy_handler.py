@@ -1,4 +1,3 @@
-import http.server
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import requests
@@ -34,6 +33,122 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             return name[:-7]
         return name
 
+    def _verify_post_capability(self, server_name, server_url, available_models):
+        """
+        Verifies POST capability: Tries /api/show with an existing model.
+        If no models exist, tries /api/pull for a default small model as a fallback check.
+        Returns True if any POST check succeeds, False otherwise.
+        """
+        fallback_model = "smollm2:135m-instruct-q2_K"  # Define the fallback model
+        _POST_VERIFY_TIMEOUT = (5, 10) 
+        if available_models:
+            # --- Primary Check: POST to /api/show ---
+            model_to_check = available_models[0]
+            verify_url = f"{server_url}/api/show"
+            post_data = json.dumps({"model": model_to_check})
+
+            self.request_logger.log(
+                event="post_verify_attempt_show",
+                user="proxy_server",
+                ip_address=self.client_address[0],
+                access="Authorized",
+                server=server_name,
+                message=f"Attempting POST verification via /api/show with model {model_to_check}",
+                request_uuid=self.request_uuid
+            )
+            try:
+                response = requests.post(
+                    verify_url,
+                    data=post_data,
+                    headers={'Content-Type': 'application/json'},
+                    timeout=_POST_VERIFY_TIMEOUT
+                )
+                response.raise_for_status()  # Check for 2xx status codes
+                ASCIIColors.green(f"POST verification via /api/show successful for {server_name}. request_uuid = {self.request_uuid}")
+                self.request_logger.log(event="post_verify_success_show", user="proxy_server", ip_address=self.client_address[0], access="Authorized", server=server_name, response_status=response.status_code, message=f"POST verification via /api/show successful for model {model_to_check}", request_uuid=self.request_uuid)
+                return True  # Success via /api/show
+
+            except requests.exceptions.RequestException as e:
+                ASCIIColors.yellow(f"POST verification via /api/show failed for {server_name}: {e}. Proceeding to fallback check if applicable. request_uuid = {self.request_uuid}")
+                self.request_logger.log(event="post_verify_failed_show", user="proxy_server", ip_address=self.client_address[0], access="Authorized", server=server_name, response_status=getattr(e.response, 'status_code', 0), error=f"POST verification via /api/show failed: {e}", request_uuid=self.request_uuid)
+                return False
+            except Exception as e:
+                ASCIIColors.red(f"Unexpected error during /api/show POST verification for {server_name}: {e}. request_uuid = {self.request_uuid}")
+                traceback.print_exc()
+                self.request_logger.log(event="post_verify_error_show", user="proxy_server", ip_address=self.client_address[0], access="Authorized", server=server_name, error=f"Unexpected /api/show POST error: {e}", request_uuid=self.request_uuid)
+                return False
+
+        # --- Fallback Check: POST to /api/pull (if no models were available) ---
+        ASCIIColors.yellow(f"No available models for {server_name}. Attempting POST verification via /api/pull fallback. request_uuid = {self.request_uuid}")
+        verify_url = f"{server_url}/api/pull"
+        post_data = json.dumps({"model": fallback_model, "stream": False})  # Use stream=False for a quicker check
+
+        self.request_logger.log(
+            event="post_verify_attempt_pull_fallback",
+            user="proxy_server",
+            ip_address=self.client_address[0],
+            access="Authorized",
+            server=server_name,
+            message=f"Attempting POST verification to {verify_url} with fallback model {fallback_model}",
+            request_uuid=self.request_uuid
+        )
+
+        try:
+            # Use a potentially slightly longer timeout for pull, but still reasonable for a check
+            pull_verify_timeout = (10, 60)  # e.g., 5s connect, 30s read
+            response = requests.post(
+                verify_url,
+                data=post_data,
+                headers={'Content-Type': 'application/json'},
+                timeout=pull_verify_timeout
+            )
+            response.raise_for_status()  # Check for 2xx status codes
+
+            ASCIIColors.green(f"POST verification via /api/pull fallback successful for {server_name}. request_uuid = {self.request_uuid}")
+            self.request_logger.log(
+                event="post_verify_success_pull_fallback",  # Specific event
+                user="proxy_server",
+                ip_address=self.client_address[0],
+                access="Authorized",
+                server=server_name,
+                response_status=response.status_code,
+                message=f"POST verification via /api/pull fallback succeeded for model {fallback_model}",
+                request_uuid=self.request_uuid
+            )
+            try:
+                response.close()
+            except Exception:
+                pass
+            return True
+
+        except requests.exceptions.RequestException as e:
+            ASCIIColors.yellow(f"POST verification via /api/pull fallback failed for {server_name}: {e}. request_uuid = {self.request_uuid}")
+            self.request_logger.log(
+                event="post_verify_failed_pull_fallback",  # Specific event
+                user="proxy_server",
+                ip_address=self.client_address[0],
+                access="Authorized",
+                server=server_name,
+                response_status=getattr(e.response, 'status_code', 0),
+                error=f"POST verification via /api/pull fallback failed: {e}",
+                request_uuid=self.request_uuid
+            )
+            return False
+        except Exception as e:
+            ASCIIColors.red(f"Unexpected error during /api/pull fallback POST verification for {server_name}: {e}. request_uuid = {self.request_uuid}")
+            traceback.print_exc()
+            self.request_logger.log(
+                event="post_verify_error_pull_fallback",  # Specific event
+                user="proxy_server",
+                ip_address=self.client_address[0],
+                access="Authorized",
+                server=server_name,
+                error=f"Unexpected /api/pull fallback POST error: {e}",
+                request_uuid=self.request_uuid
+            )
+            return False
+
+
     def get_reachable_servers(self, path):
         """Returns list of servers sorted by queue size and filtered by network reachability and ability to serve the given request path"""
         reachable = []
@@ -50,6 +165,16 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                     if not enabled or path in enabled:
                         available_models = self.get_server_available_models(server_name, config["url"])
                         config["available_models"] = available_models
+
+                        # Verify POST capability (using one of the available models)
+                        if self._verify_post_capability(server_name, config["url"], available_models):
+                            # Only add if all checks pass (reachable, enabled, GET models, POST verify)
+                            reachable.append(server)
+                        else:
+                            ASCIIColors.yellow(
+                                f"Server {server_name} failed POST verification, excluding. request_uuid = {self.request_uuid}"
+                            )
+
                         reachable.append(server)
             except Exception as e:
                 ASCIIColors.yellow(
