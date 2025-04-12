@@ -34,15 +34,6 @@ COPY build_proxy_conf.sh /app
 COPY authorized_users.txt /app
 COPY prune_old_peers.sh /app
 
-
-# Configure bash history
-RUN { \
-    grep -qxF 'export HISTFILESIZE=2000' /etc/bashrc || echo 'export HISTFILESIZE=2000' >> /etc/bashrc; \
-    grep -qxF 'export HISTSIZE=1000' /etc/bashrc || echo 'export HISTSIZE=1000' >> /etc/bashrc; \
-    grep -qxF 'export HISTFILE=~/.bash_history' /etc/bashrc || echo 'export HISTFILE=~/.bash_history' >> /etc/bashrc; \
-    grep -qxF 'PROMPT_COMMAND="history -a; $PROMPT_COMMAND"' /etc/bashrc || echo 'PROMPT_COMMAND="history -a; $PROMPT_COMMAND"' >> /etc/bashrc; \
-}
-
 # Default command
 WORKDIR /app
 ENTRYPOINT ["/app/startup.sh"]
