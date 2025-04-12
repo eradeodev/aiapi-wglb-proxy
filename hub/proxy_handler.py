@@ -252,36 +252,43 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
     # --- Helper Methods ---
 
     def _log_request_outcome(self, event, server_name, path, get_params, post_data,
-                            client_ip, start_time, response=None, error=None,
-                            queue_size=-1, access="Authorized"):
+                         client_ip, start_time, response=None, error=None,
+                         queue_size=-1, access="Authorized"):
         """Centralized logging for request outcomes."""
         duration = time.time() - start_time if start_time else None
-        # Ensure post_data is bytes before decoding attempt
         post_body_str = post_data.decode('utf-8', errors='ignore') if isinstance(post_data, bytes) else str(post_data)
         status = getattr(response, 'status_code', None)
 
         log_data = {
             "event": event,
-            "user": self.user, # Use instance user attribute
+            "user": self.user,
             "ip_address": client_ip,
-            "access": access,
-            "server": server_name,
-            "nb_queued_requests_on_server": queue_size,
-            "request_path": path,
-            "request_params": get_params,
-            "request_body": post_body_str, # Log decoded string
         }
-        if status is not None:
+
+        # Optional fields (only add if non-empty/non-default)
+        if access:
+            log_data["access"] = access
+        if server_name:
+            log_data["server"] = server_name
+        if queue_size and queue_size != -1:
+            log_data["nb_queued_requests_on_server"] = queue_size
+        if path:
+            log_data["request_path"] = path
+        if get_params:
+            log_data["request_params"] = get_params
+        if post_body_str.strip():
+            log_data["request_body"] = post_body_str
+        if status and status != 0:
             log_data["response_status"] = status
+        if duration:
+            log_data["duration"] = round(duration, 4)
         if error is not None:
             if isinstance(error, requests.exceptions.HTTPError) and error.response is not None:
                 log_data["error"] = f"HTTP error {error.response.status_code}: {error}"
-                log_data["response_status"] = error.response.status_code
+                if error.response.status_code:
+                    log_data["response_status"] = error.response.status_code
             else:
                 log_data["error"] = str(error)
-
-        if duration is not None:
-            log_data["duration"] = round(duration, 4) # Add duration if available
 
         self.request_logger.log(**log_data)
 
@@ -570,17 +577,17 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 )
 
                 if request_handled:
-                    ASCIIColors.green(f"Request successfully handled by server '{server_name}'.")
+                    ASCIIColors.green(f"{path} request successfully handled by server '{server_name}'.")
                     # Success logged within _attempt_request_on_server
                     return # Exit routing function
 
                 # If request_handled is False, log attempt failure and continue loop
-                ASCIIColors.yellow(f"Attempt on server '{server_name}' failed. Trying next available server or retrying...")
+                ASCIIColors.yellow(f"{path} request attempt on server '{server_name}' failed. Trying next available server or retrying...")
                 # Loop continues
 
         # If loop completes without returning, all attempts failed
         all_tried_servers_str = ', '.join(sorted(list(tried_servers_overall)))
-        retry_failed_message = f"Failed to process request on any reachable server after {_MAX_RETRIES} attempts. Tried: [{all_tried_servers_str}]"
+        retry_failed_message = f"Failed to process {path} request on any reachable server after {_MAX_RETRIES} attempts. Tried: [{all_tried_servers_str}]"
         ASCIIColors.red(retry_failed_message)
 
         # --- Use _log_request_outcome for final routing failure ---
