@@ -12,7 +12,7 @@ _GENERATE_PATHS = {"/api/generate", "/api/embed", "/api/chat", "/v1/chat/complet
 _PROXY_TIMEOUT = (60, 3600)  # (connect timeout, read timeout)
 _MAX_RETRIES = 3
 # Backoff schedule in seconds
-_BACKOFF_SCHEDULE = [5 * 60, 10 * 60, 15 * 60, 30 * 60, 60 * 60]
+_BACKOFF_SCHEDULE = [15, 30, 60, 120, 300]
 
 
 class ProxyRequestHandler(BaseHTTPRequestHandler):
