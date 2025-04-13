@@ -14,8 +14,8 @@ services:
       - DEFAULT_PEER_PRIV_KEY=${DEFAULT_PEER_PRIV_KEY}
       - ENABLED_FOR_REQUESTS=${ENABLED_FOR_REQUESTS}
       - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_KEEP_ALIVE=5m
-      - OLLAMA_NUM_PARALLEL=2
+      - OLLAMA_KEEP_ALIVE=15m
+      - OLLAMA_NUM_PARALLEL=1
       - OLLAMA_DEBUG=1
     # Remove the Deploy item for CPU inference
     deploy:
