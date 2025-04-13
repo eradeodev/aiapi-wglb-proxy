@@ -428,7 +428,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                          queue_size=-1, access="Authorized", request_uuid=None):
         """Centralized logging for request outcomes."""
         duration = time.time() - start_time if start_time else None
-        post_body_str = post_data.decode('utf-8', errors='ignore') if isinstance(post_data, bytes) else str(post_data)
         status = getattr(response, 'status_code', None)
 
         log_data = {
@@ -448,8 +447,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             log_data["request_path"] = path
         if get_params:
             log_data["request_params"] = get_params
-        if post_body_str.strip():
-            log_data["request_body"] = post_body_str
         if status and status != 0:
             log_data["response_status"] = status
         if duration:
@@ -880,7 +877,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                     error="No reachable Ollama servers (or all in backoff)",
                     request_path=self.request_path,
                     request_params=self.request_get_params,
-                    request_body=self.request_post_data.decode('utf-8', errors='ignore') if isinstance(self.request_post_data, bytes) else str(self.request_post_data),
                     duration = time.time() - start_time, # Log duration up to this point
                     request_uuid=self.request_uuid
                 )
