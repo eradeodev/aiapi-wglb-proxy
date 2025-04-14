@@ -16,6 +16,7 @@ COPY ascii_colors.py .
 COPY config_manager.py .
 COPY logger.py .
 COPY proxy_handler.py .
+COPY reachable_server_manager.py .
 
 # Copy custom logrotate config
 COPY access_log_rotate.conf /etc/logrotate.d/access_log
