@@ -118,7 +118,7 @@ done
 
 # Start chunker server in background
 echo "Starting chunker server"
-cd /app/chunker_server && gunicorn --bind 0.0.0.0:11435 app:app --workers $CHUNKER_WORKERS &
+cd /app/chunker_server && conda run -n py39 gunicorn --bind 0.0.0.0:11435 app:app --workers $CHUNKER_WORKERS &
 
 # start ollama
 echo "Starting ollama"
