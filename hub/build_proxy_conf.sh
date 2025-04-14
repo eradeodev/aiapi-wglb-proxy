@@ -17,7 +17,7 @@ for file in "$PEERS_DIR"/*; do
         ENABLED=$(grep -oP 'EnabledForRequests = \K.*' "$file")
         UUID_SERVER_NAME=$(grep -oP 'ServerName = \K.*' "$file")
         if [[ -n "$IP" ]]; then
-            SERVER_NAME="${UUID_SERVER_NAME}$count"
+            SERVER_NAME="${UUID_SERVER_NAME}_$count"
             echo "[$SERVER_NAME]" >> "$OUTPUT_FILE"
             echo "url = http://$IP:$PORT" >> "$OUTPUT_FILE"
             echo "enabled_for_requests = $ENABLED" >> "$OUTPUT_FILE"
