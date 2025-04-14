@@ -75,7 +75,7 @@ def process_chunking_request(data):
     base64_text = data.get('text_base64')
     chunk_size = data.get('chunk_size', 256)
     tokenizer_name = data.get('tokenizer', 'o200k_base') # Defaulting here
-    overlap = data.get('overlap', 0.0) # Can be float (ratio) or int (token count)
+    overlap = data.get('overlap', 0.0) # Can be float (ratio) if <1 or int (token count) if >=1
 
     if not base64_text:
         raise ValueError("Missing 'text_base64' field in request JSON.")
