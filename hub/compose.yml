@@ -12,6 +12,7 @@ services:
     ports:
       - 51820:51820/udp
       - 11434:11434
+      - 11435:11435
     environment:
       - HUB_PRIV_KEY=${HUB_PRIV_KEY}
       - DEFAULT_PEER_PUB_KEY=${DEFAULT_PEER_PUB_KEY}
