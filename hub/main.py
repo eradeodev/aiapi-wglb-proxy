@@ -51,7 +51,7 @@ def main():
     server_address = ("", args.port)
 
     # Setup ReachableServerManager
-    reachable_server_manager = ReachableServerManager
+    reachable_server_manager = ReachableServerManager()
     reachable_server_manager.config_manager = config_manager
     reachable_server_manager.server_logger = server_logger
 

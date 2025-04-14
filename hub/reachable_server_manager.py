@@ -10,9 +10,11 @@ import traceback
 _BACKOFF_SCHEDULE = [15, 30, 60, 120, 300]
 
 class ReachableServerManager():
-    config_manager = None
-    server_logger = None
-    reachable_servers_array = None
+
+    def __init__(self):
+        self.config_manager = None
+        self.server_logger = None
+        self.reachable_servers_array = None
 
     def _calculate_next_backoff(self, current_backoff_duration):
         """Calculates the next backoff duration based on the schedule."""
