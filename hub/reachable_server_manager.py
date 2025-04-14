@@ -94,7 +94,6 @@ class ReachableServerManager():
         self.server_logger.log(
             event="retrieving_models",
             user="proxy_server",
-            ip_address=self.client_address[0],
             access="Authorized",
             server=server_name,
             nb_queued_requests_on_server=-1,
@@ -112,7 +111,6 @@ class ReachableServerManager():
             self.server_logger.log(
                 event="retrieving_models",
                 user="proxy_server",
-                ip_address=self.client_address[0],
                 access="Authorized",
                 server=server_name,
                 nb_queued_requests_on_server=-1,
@@ -128,7 +126,6 @@ class ReachableServerManager():
             self.server_logger.log(
                 event="retrieving_models_failed",
                 user="proxy_server",
-                ip_address=self.client_address[0],
                 access="Authorized",
                 server=server_name,
                 error=f"Failed retrieving models: {e}",
