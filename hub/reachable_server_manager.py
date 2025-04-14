@@ -62,7 +62,6 @@ class ReachableServerManager():
             self.server_logger.log(
                 event="post_verify_attempt_show",
                 user="proxy_server",
-                ip_address=self.client_address[0],
                 access="Authorized",
                 server=server_name,
                 message=f"Attempting POST verification via /api/show with model {model_to_check}",
@@ -76,17 +75,17 @@ class ReachableServerManager():
                 )
                 response.raise_for_status()  # Check for 2xx status codes
                 ASCIIColors.green(f"POST verification via /api/show successful for {server_name}.")
-                self.server_logger.log(event="post_verify_success_show", user="proxy_server", ip_address=self.client_address[0], access="Authorized", server=server_name, response_status=response.status_code, message=f"POST verification via /api/show successful for model {model_to_check}", )
+                self.server_logger.log(event="post_verify_success_show", user="proxy_server", access="Authorized", server=server_name, response_status=response.status_code, message=f"POST verification via /api/show successful for model {model_to_check}", )
                 return True  # Success via /api/show
 
             except requests.exceptions.RequestException as e:
                 ASCIIColors.yellow(f"POST verification via /api/show failed for {server_name}: {e}. Proceeding to fallback check if applicable.")
-                self.server_logger.log(event="post_verify_failed_show", user="proxy_server", ip_address=self.client_address[0], access="Authorized", server=server_name, response_status=getattr(e.response, 'status_code', 0), error=f"POST verification via /api/show failed: {e}", )
+                self.server_logger.log(event="post_verify_failed_show", user="proxy_server", access="Authorized", server=server_name, response_status=getattr(e.response, 'status_code', 0), error=f"POST verification via /api/show failed: {e}", )
                 return False
             except Exception as e:
                 ASCIIColors.red(f"Unexpected error during /api/show POST verification for {server_name}: {e}.")
                 traceback.print_exc()
-                self.server_logger.log(event="post_verify_error_show", user="proxy_server", ip_address=self.client_address[0], access="Authorized", server=server_name, error=f"Unexpected /api/show POST error: {e}", )
+                self.server_logger.log(event="post_verify_error_show", user="proxy_server", access="Authorized", server=server_name, error=f"Unexpected /api/show POST error: {e}", )
                 return False # Treat unexpected errors as failure
 
 
