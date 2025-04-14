@@ -90,7 +90,7 @@ class ReachableServerManager():
                 return False # Treat unexpected errors as failure
 
 
-    def get_server_available_models(self, server_name, server_url, request_uuid):
+    def get_server_available_models(self, server_name, server_url, request_uuid=''):
         """Queries the server for its available models via a GET request to /api/tags."""
         self.server_logger.log(
             event="retrieving_models",
