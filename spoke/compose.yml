@@ -19,6 +19,12 @@ services:
       - OLLAMA_DEBUG=1
       - CHUNKER_WORKERS=1
       - CHUNKER_MAX_CONCURRENT_THREADS_PER_WORKER=4
+    healthcheck:
+      test: "ollama --version && ollama ps || exit 1"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
     # Remove the Deploy item for CPU inference
     deploy:
           resources:

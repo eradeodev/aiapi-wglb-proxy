@@ -610,10 +610,16 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 new_netloc = parsed_url.hostname + ':11435'
                 url_to_use = urlunparse(parsed_url._replace(netloc=new_netloc))
 
+            headers = {
+                'Content-type':'application/json', 
+                'Accept':'application/json'
+            }
+
             response = requests.request(
                 self.command,
                 url_to_use + path,
                 params=get_params,
+                headers=headers,
                 data=current_post_data, # Use current (potentially updated) post data
                 stream=stream,
                 timeout=_PROXY_TIMEOUT,

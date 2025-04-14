@@ -137,6 +137,7 @@ def process_chunking_request(data):
 def handle_chunk_request():
     """API endpoint to chunk text."""
     if not request.is_json:
+        logging.info(f"request wasn't JSON??? == {request}")
         return jsonify({"error": "Request must be JSON"}), 415 # Unsupported Media Type
 
     data = request.get_json()

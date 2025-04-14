@@ -118,8 +118,26 @@ done
 
 # Start chunker server in background
 echo "Starting chunker server"
-cd /app/chunker_server && conda run -n py39 gunicorn --bind 0.0.0.0:11435 app:app --workers $CHUNKER_WORKERS &
+cd /app/chunker_server && conda run -n py39 gunicorn --bind 0.0.0.0:11435 app:app --workers $CHUNKER_WORKERS --access-logfile /proc/1/fd/1 --error-logfile /proc/1/fd/2 &
 
 # start ollama
-echo "Starting ollama"
-exec /bin/ollama serve
+echo "Starting Ollama server..."
+ollama serve &
+
+echo "Waiting for Ollama server to be active..."
+while [ "$(ollama list | grep 'NAME')" == "" ]; do
+  sleep 1
+done
+
+# Ensure we have at least one model present for POST connectivity check via /api/show
+ollama pull eradeo/inf-retriever-v1-1.5B-causal-F16
+
+# Get the PID of the running ollama serve process
+OLLAMA_PID=$(pgrep -f "ollama serve")
+
+# Wait for any background initialization to complete
+echo "Ollama server running with PID: $OLLAMA_PID"
+echo "Taking over the ollama serve process..."
+
+# Use exec to replace this script with the ollama process
+exec tail --pid=$OLLAMA_PID -f /dev/null

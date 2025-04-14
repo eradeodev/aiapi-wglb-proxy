@@ -33,12 +33,13 @@ WORKDIR /app
 # Copy everything from the current directory into the container
 COPY create_new_peer.sh /app
 COPY initial_config.conf /app
-COPY startup.sh /app
 COPY check_host.sh /app
 COPY chunker_server /app/chunker_server
 
 # Install requirements for chunker_server
 RUN conda run -n py39 pip install -r /app/chunker_server/requirements.txt
+
+COPY startup.sh /app
 
 # Default command
 ENTRYPOINT ["/app/startup.sh"]
