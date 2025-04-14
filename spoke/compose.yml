@@ -17,6 +17,7 @@ services:
       - OLLAMA_HOST=0.0.0.0
       - CHUNKER_WORKERS=1
       - CHUNKER_MAX_CONCURRENT_THREADS_PER_WORKER=4
+      - UUID_SERVER_NAME=${UUID_SERVER_NAME}
     healthcheck:
       test: "ollama --version && ollama ps || exit 1"
       interval: 30s
