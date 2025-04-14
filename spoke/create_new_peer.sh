@@ -35,6 +35,7 @@ if [ -z "$SPOKE_IP" ]; then
 fi
 
 # Create new peer config content
+echo "UUID_SERVER_NAME === $UUID_SERVER_NAME"
 cat > new_peer.txt << EOF
 
 [Peer]

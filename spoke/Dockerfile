@@ -41,5 +41,6 @@ RUN conda run -n py39 pip install -r /app/chunker_server/requirements.txt
 
 COPY startup.sh /app
 
+
 # Default command
 ENTRYPOINT ["/app/startup.sh"]
