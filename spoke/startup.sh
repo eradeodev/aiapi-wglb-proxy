@@ -130,7 +130,7 @@ while [ "$(ollama list | grep 'NAME')" == "" ]; do
 done
 
 # Ensure we have at least one model present for POST connectivity check via /api/show
-ollama pull eradeo/inf-retriever-v1-1.5B-causal-F16
+ollama pull granite-embedding:278m-fp16
 
 # Get the PID of the running ollama serve process
 OLLAMA_PID=$(pgrep -f "ollama serve")
