@@ -133,7 +133,7 @@ def process_chunking_request(data):
     return output
 
 # --- Flask Route ---
-@app.route('/chunk', methods=['POST'])
+@app.route('/api/chunk', methods=['POST'])
 def handle_chunk_request():
     """API endpoint to chunk text."""
     if not request.is_json:
