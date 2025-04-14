@@ -42,6 +42,7 @@ PublicKey = $PUBLIC_KEY
 AllowedIPs = $SPOKE_IP/32
 PersistentKeepalive = 25
 EnabledForRequests = $ENABLED_FOR_REQUESTS
+ServerName = $SERVER_NAME
 EOF
 
 # Attempt to send new peer config with retries
