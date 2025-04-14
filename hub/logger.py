@@ -3,7 +3,7 @@ from pathlib import Path
 import datetime
 import sys
 
-class RequestLogger:
+class ServerLogger:
     def __init__(self, log_file_path):
         self.log_file_path = Path(log_file_path)
         self._ensure_log_file_exists()

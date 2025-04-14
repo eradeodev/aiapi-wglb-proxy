@@ -10,11 +10,14 @@ import argparse
 from http.server import HTTPServer
 from socketserver import ThreadingMixIn
 import time
+import threading
 
 from config_manager import ConfigManager
+from reachable_server_manager import ReachableServerManager
 from proxy_handler import ProxyRequestHandler
-from logger import RequestLogger
+from logger import ServerLogger
 from ascii_colors import ASCIIColors
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -36,7 +39,7 @@ def main():
     args = parser.parse_args()
 
     config_manager = ConfigManager(args.config, args.users_list)
-    request_logger = RequestLogger(args.log_path)
+    server_logger = ServerLogger(args.log_path)
     deactivate_security = args.deactivate_security
 
     ASCIIColors.red("Ollama Proxy server")
@@ -46,9 +49,21 @@ def main():
 
     print("Starting server")
     server_address = ("", args.port)
+
+    # Setup ReachableServerManager
+    reachable_server_manager = ReachableServerManager
+    reachable_server_manager.config_manager = config_manager
+    reachable_server_manager.server_logger = server_logger
+
+    # Create and start the thread
+    reachable_server_manager_thread = threading.Thread(target=reachable_server_manager.run)
+    reachable_server_manager_thread.daemon = True  # makes the thread exit when the main program does
+    reachable_server_manager_thread.start()
+
     handler_class = ProxyRequestHandler
     handler_class.config_manager = config_manager
-    handler_class.request_logger = request_logger
+    handler_class.reachable_server_manager = reachable_server_manager
+    handler_class.request_logger = server_logger
     handler_class.deactivate_security = deactivate_security
 
     httpd = ThreadedHTTPServer(server_address, handler_class)
