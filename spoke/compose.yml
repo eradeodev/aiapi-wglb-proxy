@@ -17,6 +17,8 @@ services:
       - OLLAMA_KEEP_ALIVE=15m
       - OLLAMA_NUM_PARALLEL=1
       - OLLAMA_DEBUG=1
+      - CHUNKER_WORKERS=1
+      - CHUNKER_MAX_CONCURRENT_THREADS_PER_WORKER=4
     # Remove the Deploy item for CPU inference
     deploy:
           resources:

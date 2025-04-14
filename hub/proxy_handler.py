@@ -1,5 +1,6 @@
 from http.server import BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, urlunparse, parse_qs
+
 import requests
 import json
 import socket
@@ -602,9 +603,16 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         # 3. Execute the request
         try:
             stream = post_data_dict.get("stream", False) if is_generate_path else False
+            url_to_use = config["url"]
+            if path == "/api/chunk":
+                # Replace port section of URL with 11435
+                parsed_url = urlparse(url_to_use)
+                new_netloc = parsed_url.hostname + ':11435'
+                url_to_use = urlunparse(parsed_url._replace(netloc=new_netloc))
+
             response = requests.request(
                 self.command,
-                config["url"] + path,
+                url_to_use + path,
                 params=get_params,
                 data=current_post_data, # Use current (potentially updated) post data
                 stream=stream,
