@@ -39,6 +39,7 @@ class ReachableServerManager():
 
         first_item = enabled[0]
         port = first_item.split('/')[0]
+        port = int(port.strip(":"))
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(10)
