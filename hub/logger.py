@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import datetime
 import sys
+from ascii_colors import ASCIIColors
 
 class ServerLogger:
     def __init__(self, log_file_path):
@@ -18,11 +19,18 @@ class ServerLogger:
             "time_stamp": datetime.datetime.now().isoformat()
         }
 
+        color = None
+
         for key, value in kwargs.items():
             if value not in (None, "", [], {}, 0, -1):
                 log_entry[key] = value
+            if "error" == key and value not in (None, "", [], {}, 0, -1):
+                color = ASCIIColors.RED
 
+        output = json.dumps(log_entry)
+        if color:
+            output = f"{color}{output}{ASCIIColors.RESET}"
         with open(self.log_file_path, mode="a", encoding="utf-8") as f:
-            f.write(json.dumps(log_entry) + "\n")
+            f.write(output + "\n")
 
-        sys.stderr.write(f"{log_entry}\n")
+        sys.stderr.write(f"{output}\n")
