@@ -21,7 +21,7 @@ tokenizer_cache = {}
 tokenizer_lock = threading.Lock() # Protects access to tokenizer_cache
 
 # --- Logging Setup ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging = logging.getLogger('gunicorn.error')
 
 # --- Helper Functions ---
 

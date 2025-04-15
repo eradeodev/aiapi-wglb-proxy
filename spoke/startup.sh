@@ -133,7 +133,8 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
         elif [[ "$endpoint_config" == *"/api/chunk"* ]]; then
             port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
             echo "Starting gunicorn serve for chunking on port $port"
-            cd /app/chunker_server && conda run -n py312 gunicorn --bind 0.0.0.0:$port app:app --workers $CHUNKER_WORKERS --access-logfile /proc/1/fd/1 --error-logfile /proc/1/fd/2 &
+            cd /app/chunker_server
+            conda run -n py312 gunicorn --log-level debug --enable-stdio-inheritance --bind 0.0.0.0:$port app:app --workers $CHUNKER_WORKERS --access-logfile /proc/1/fd/1 --error-logfile /proc/1/fd/2 &
         fi
     done
 fi
