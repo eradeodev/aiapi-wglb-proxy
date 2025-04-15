@@ -10,7 +10,7 @@ import uuid
 
 
 # @Work @EX TODO support passing token indicating request should be served via runpod
-_GENERATE_PATHS = {"/api/generate", "/api/embed", "/api/chat", "/v1/chat/completions"}
+_GENERATE_PATHS = {"/api/chunk", "/v1/embeddings", "/v1/chat/completions"}
 _PROXY_TIMEOUT = (60, 3600)  # (connect timeout, read timeout)
 _MAX_RETRIES = 3
 
