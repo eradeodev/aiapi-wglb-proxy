@@ -27,20 +27,19 @@ RUN /root/miniconda3/bin/conda init bash && \
     conda create -n py39 python=3.9 -y && \
     echo "conda activate py39" >> /root/.bashrc
 
+# Copy chunker_server requirements and install them
+COPY chunker_server/requirements.txt /app/chunker_server/
+RUN conda run -n py39 pip install -r /app/chunker_server/requirements.txt
+
 # Set the working directory
 WORKDIR /app
 
-# Copy everything from the current directory into the container
-COPY create_new_peer.sh /app
-COPY initial_config.conf /app
-COPY check_host.sh /app
-COPY chunker_server /app/chunker_server
+# Copy the peer setup and host check scripts
+COPY initial_config.conf create_new_peer.sh check_host.sh /app/
 
-# Install requirements for chunker_server
-RUN conda run -n py39 pip install -r /app/chunker_server/requirements.txt
+# Copy chunker_server app.py
+COPY chunker_server/app.py /app/chunker_server/
 
+# Copy startup script for entrypoint
 COPY startup.sh /app
-
-
-# Default command
 ENTRYPOINT ["/app/startup.sh"]

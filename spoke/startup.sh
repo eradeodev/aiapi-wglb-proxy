@@ -76,7 +76,7 @@ while ! ./check_host.sh 10.123.123.1; do
     ((count++))
     echo "Waiting for connection to 10.123.123.1 via new config..."
     sleep 2
-    if [[ $count -eq 60 ]]; then
+    if [[ $count -eq 6 ]]; then # 6 attempts == 3 minutes at 30 seconds per host check attempt
         echo "couldn't connect. Attempting to retrieve new config..."
         wg-quick down ./wg-configs/custom_config.conf
         rm -f wg-configs/custom_config.conf
