@@ -170,3 +170,8 @@ def handle_chunk_request():
 @app.route('/health', methods=['GET'])
 def handle_health():
     return '', 200 # Empty response with 200 OK
+
+
+@app.route('/ping', methods=['GET', 'POST'])
+def handle_ping():
+    return '', 200 # Empty response with 200 OK

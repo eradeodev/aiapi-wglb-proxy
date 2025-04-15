@@ -52,14 +52,22 @@ class ReachableServerManager():
                 )
                 return False
 
-    def _verify_post_capability(self, server_name, server_url):
+    def _verify_post_capability(self, server_name, server_config):
         """
-        Verifies POST capability: Tries /api/show with an existing model.
+        Verifies POST capability: Tries /ping via POST.
         Returns True if any POST check succeeds, False otherwise.
         """
         _POST_VERIFY_TIMEOUT = (5, 10)
-        # --- Primary Check: POST to /api/show ---
-        verify_url = f"{server_url}:11433/ping" # TODO hardcoded
+
+        server_url = server_config["url"]
+        enabled = server_config.get("enabled_for_requests", [])
+
+        first_item = enabled[0]
+        port = first_item.split('/')[0]
+        port = int(port.strip(":"))
+
+        # --- Primary Check: POST ---
+        verify_url = f"{server_url}:{port}/ping"
 
         self.server_logger.log(
             event="post_verify_attempt_show",
@@ -121,7 +129,7 @@ class ReachableServerManager():
                     )
 
                     # Verify POST capability
-                    post_verified = self._verify_post_capability(server_name, config["url"])
+                    post_verified = self._verify_post_capability(server_name, config)
 
                     if post_verified:
                         # --- Success: Reset backoff state ---

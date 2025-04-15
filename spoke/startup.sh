@@ -127,7 +127,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
         elif [[ "$endpoint_config" == *"/v1/chat/completions"* ]]; then
             port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
             echo "Starting vllm serve for completions on port $port"
-            vllm serve "unsloth/DeepSeek-R1-Distill-Qwen-14B-unsloth-bnb-4bit" --task generate --max-model-len 1024 --enforce-eager --host 0.0.0.0 --port "$port" &
+            vllm serve "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B" --task generate --max-model-len 1024 --enforce-eager --gpu-memory-utilization 0.8 --enable-reasoning --reasoning-parser deepseek_r1 --max_num_batched_tokens 64 --max_num_seqs 64 --host 0.0.0.0 --port "$port" &
         elif [[ "$endpoint_config" == *"/api/chunk"* ]]; then
             port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
             echo "Starting gunicorn serve for chunking on port $port"
