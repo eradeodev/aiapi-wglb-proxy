@@ -199,7 +199,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             log_data["access"] = access
         if server_name:
             log_data["server"] = server_name
-        if queue_size and queue_size != -1:
+        if queue_size != -1:
             log_data["nb_queued_requests_on_server"] = queue_size
         if path:
             log_data["request_path"] = path
@@ -258,8 +258,9 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         # Log initial attempt (if applicable) and prepare request
         if is_generate_path and load_tracker:
             # Log the *actual* post data being sent (potentially updated)
-            self._log_request_outcome(f"{log_event_prefix}_request", server_name, path, get_params, current_post_data, client_ip, None, queue_size=queue_size, request_uuid=self.request_uuid)
             load_tracker.put_nowait(1)
+            self._log_request_outcome(f"{log_event_prefix}_request", server_name, path, get_params, current_post_data, client_ip, None, queue_size=load_tracker.qsize() if load_tracker else -1, request_uuid=self.request_uuid)
+    
 
         response = None
         error = None
