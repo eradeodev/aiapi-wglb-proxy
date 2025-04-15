@@ -199,7 +199,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             log_data["access"] = access
         if server_name:
             log_data["server"] = server_name
-        if queue_size is not None and queue_size != -1:
+        if queue_size and queue_size != -1:
             log_data["nb_queued_requests_on_server"] = queue_size
         if path:
             log_data["request_path"] = path
