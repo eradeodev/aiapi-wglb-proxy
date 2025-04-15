@@ -27,7 +27,7 @@ class ConfigManager:
                 enabled_for_requests = [
                     endpoint.strip() for endpoint in config[name].get("enabled_for_requests", "").split(",") if endpoint.strip()
                 ]
-                new_data = {"url": new_url, "queue": Queue(), "last_processed_time": 0, "available_models": [], "enabled_for_requests": enabled_for_requests,}
+                new_data = {"url": new_url, "queue": Queue(), "last_processed_time": 0, "enabled_for_requests": enabled_for_requests,}
                 if name in current_servers_dict:
                     old_data = current_servers_dict[name]
                     if old_data["url"] == new_url:
@@ -37,7 +37,6 @@ class ConfigManager:
                     else:
                         new_data["queue"] = old_data["queue"]
                         new_data["last_processed_time"] = old_data["last_processed_time"]
-                        new_data["available_models"] = old_data["available_models"]
                         new_servers.append((name, new_data))
                 else:
                     new_servers.append((name, new_data))
@@ -53,13 +52,6 @@ class ConfigManager:
             for name, data in self._servers:
                 if name == server_name:
                     data['last_processed_time'] = time.time()
-                    break
-
-    def update_server_available_models(self, server_name, available_models):
-        with self._thread_lock:
-            for name, data in self._servers:
-                if name == server_name:
-                    data['available_models'] = available_models
                     break
 
     def _load_users(self):

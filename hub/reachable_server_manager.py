@@ -2,7 +2,6 @@ import time
 from ascii_colors import ASCIIColors
 from urllib.parse import urlparse 
 import socket
-import json
 import requests
 import traceback
 
@@ -47,91 +46,42 @@ class ReachableServerManager():
                 )
                 return False
 
-    def _verify_post_capability(self, server_name, server_url, available_models):
+    def _verify_post_capability(self, server_name, server_url):
         """
         Verifies POST capability: Tries /api/show with an existing model.
         Returns True if any POST check succeeds, False otherwise.
         """
         _POST_VERIFY_TIMEOUT = (5, 10)
-        if available_models:
-            # --- Primary Check: POST to /api/show ---
-            model_to_check = available_models[0]
-            verify_url = f"{server_url}/api/show"
-            post_data = json.dumps({"model": model_to_check})
+        # --- Primary Check: POST to /api/show ---
+        verify_url = f"{server_url}:11433/ping" # TODO hardcoded
 
-            self.server_logger.log(
-                event="post_verify_attempt_show",
-                user="proxy_server",
-                access="Authorized",
-                server=server_name,
-                message=f"Attempting POST verification via /api/show with model {model_to_check}",
-            )
-            try:
-                response = requests.post(
-                    verify_url,
-                    data=post_data,
-                    headers={'Content-Type': 'application/json'},
-                    timeout=_POST_VERIFY_TIMEOUT
-                )
-                response.raise_for_status()  # Check for 2xx status codes
-                ASCIIColors.green(f"POST verification via /api/show successful for {server_name}.")
-                self.server_logger.log(event="post_verify_success_show", user="proxy_server", access="Authorized", server=server_name, response_status=response.status_code, message=f"POST verification via /api/show successful for model {model_to_check}", )
-                return True  # Success via /api/show
-
-            except requests.exceptions.RequestException as e:
-                ASCIIColors.yellow(f"POST verification via /api/show failed for {server_name}: {e}. Proceeding to fallback check if applicable.")
-                self.server_logger.log(event="post_verify_failed_show", user="proxy_server", access="Authorized", server=server_name, response_status=getattr(e.response, 'status_code', 0), error=f"POST verification via /api/show failed: {e}", )
-                return False
-            except Exception as e:
-                ASCIIColors.red(f"Unexpected error during /api/show POST verification for {server_name}: {e}.")
-                traceback.print_exc()
-                self.server_logger.log(event="post_verify_error_show", user="proxy_server", access="Authorized", server=server_name, error=f"Unexpected /api/show POST error: {e}", )
-                return False # Treat unexpected errors as failure
-
-
-    def get_server_available_models(self, server_name, server_url, request_uuid=''):
-        """Queries the server for its available models via a GET request to /api/tags."""
         self.server_logger.log(
-            event="retrieving_models",
+            event="post_verify_attempt_show",
             user="proxy_server",
             access="Authorized",
             server=server_name,
-            nb_queued_requests_on_server=-1,
-            response_status=0,
-            message="Getting available models from server",
-            request_uuid=request_uuid
+            message=f"Attempting POST verification via /ping to {verify_url}",
         )
         try:
-            response = requests.get(f"{server_url}/api/tags", timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            models_data = data.get("models", [])
-            available_models = [model["name"] for model in models_data if "name" in model]
+            response = requests.post(
+                verify_url,
+                timeout=_POST_VERIFY_TIMEOUT
+            )
+            response.raise_for_status()  # Check for 2xx status codes
+            ASCIIColors.green(f"POST verification successful for {server_name}.")
+            self.server_logger.log(event="post_verify_success_show", user="proxy_server", access="Authorized", server=server_name, response_status=response.status_code, message=f"POST verification successful to {verify_url}")
+            return True  # Success
 
-            self.server_logger.log(
-                event="retrieving_models",
-                user="proxy_server",
-                access="Authorized",
-                server=server_name,
-                nb_queued_requests_on_server=-1,
-                response_status=0,
-                message=f"Retrieved these models from {server_name}: {available_models}",
-                request_uuid=request_uuid
-            )
-            self.config_manager.update_server_available_models(server_name, available_models)
-            return available_models
+        except requests.exceptions.RequestException as e:
+            ASCIIColors.yellow(f"POST verification failed for {server_name}: {e}.")
+            self.server_logger.log(event="post_verify_failed_show", user="proxy_server", access="Authorized", server=server_name, response_status=getattr(e.response, 'status_code', 0), error=f"POST verification to {verify_url} failed: {e}", )
+            return False
         except Exception as e:
-            ASCIIColors.yellow(f"Failed retrieving models for server {server_name}: {e} request_uuid = {request_uuid}")
-            # Log failure
-            self.server_logger.log(
-                event="retrieving_models_failed",
-                user="proxy_server",
-                access="Authorized",
-                server=server_name,
-                error=f"Failed retrieving models: {e}",
-                request_uuid=request_uuid
-            )
-            return []
+            ASCIIColors.red(f"Unexpected error during POST verification for {server_name}: {e}.")
+            traceback.print_exc()
+            self.server_logger.log(event="post_verify_error_show", user="proxy_server", access="Authorized", server=server_name, error=f"Unexpected POST error to {verify_url}: {e}", )
+            return False # Treat unexpected errors as failure
+
 
 
     def get_reachable_servers(self):
@@ -163,11 +113,9 @@ class ReachableServerManager():
                     ASCIIColors.yellow(
                         f"Server {server_name} enabled_for_requests = {enabled} "
                     )
-                    available_models = self.get_server_available_models(server_name, config["url"])
-                    config["available_models"] = available_models # Update cache
 
                     # Verify POST capability
-                    post_verified = self._verify_post_capability(server_name, config["url"], available_models)
+                    post_verified = self._verify_post_capability(server_name, config["url"])
 
                     if post_verified:
                         # --- Success: Reset backoff state ---
