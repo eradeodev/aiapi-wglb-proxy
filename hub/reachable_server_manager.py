@@ -124,6 +124,8 @@ class ReachableServerManager():
                 # --- Standard Checks (if not in backoff or backoff expired) ---
                 if self._is_server_reachable(server_name, config):
                     enabled = config.get("enabled_for_requests", [])
+                    if not enabled:
+                        continue
                     ASCIIColors.yellow(
                         f"Server {server_name} enabled_for_requests = {enabled} "
                     )
