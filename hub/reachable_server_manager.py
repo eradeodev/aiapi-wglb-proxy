@@ -36,7 +36,8 @@ class ReachableServerManager():
         parsed = urlparse(server_url)
         host = parsed.hostname
         enabled = server_config.get("enabled_for_requests", [])
-
+        if not enabled:
+            return False
         first_item = enabled[0]
         port = first_item.split('/')[0]
         port = int(port.strip(":"))
