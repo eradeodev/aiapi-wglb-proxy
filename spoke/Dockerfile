@@ -1,11 +1,11 @@
-FROM ollama/ollama:latest
+FROM vllm/vllm-openai
 
 ENV TZ=America/Los_Angeles
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install dependencies
 RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y wireguard-tools iproute2 netcat-openbsd iputils-ping wget && \
+    apt-get install -y wireguard-tools iproute2 netcat-openbsd iputils-ping wget curl && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Miniconda
@@ -24,12 +24,15 @@ ENV PATH $MINICONDA_PATH/bin:$PATH
 
 # Initialize Conda, create the environment, and activate it in one step
 RUN /root/miniconda3/bin/conda init bash && \
-    conda create -n py39 python=3.9 -y && \
-    echo "conda activate py39" >> /root/.bashrc
+    conda create -n py312 python=3.12 -y && \
+    echo "conda activate py312" >> /root/.bashrc
+
+RUN conda run -n py312 pip install vllm
+
 
 # Copy chunker_server requirements and install them
 COPY chunker_server/requirements.txt /app/chunker_server/
-RUN conda run -n py39 pip install -r /app/chunker_server/requirements.txt
+RUN conda run -n py312 pip install -r /app/chunker_server/requirements.txt
 
 # Set the working directory
 WORKDIR /app

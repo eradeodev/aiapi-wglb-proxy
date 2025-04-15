@@ -6,7 +6,14 @@ services:
     restart: always
     volumes:
       - configs:/app/wg-configs
-      - ollama:/root/.ollama
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    ports:
+      - 11434:11434
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     cap_add:
       - NET_ADMIN
     environment:
@@ -14,16 +21,9 @@ services:
       - HUB_PUB_KEY=${HUB_PUB_KEY}
       - DEFAULT_PEER_PRIV_KEY=${DEFAULT_PEER_PRIV_KEY}
       - ENABLED_FOR_REQUESTS=${ENABLED_FOR_REQUESTS}
-      - OLLAMA_HOST=0.0.0.0
       - CHUNKER_WORKERS=1
       - CHUNKER_MAX_CONCURRENT_THREADS_PER_WORKER=4
       - UUID_SERVER_NAME=${UUID_SERVER_NAME}
-    healthcheck:
-      test: "ollama --version && ollama ps || exit 1"
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 120s
     # Remove the Deploy item for CPU inference
     deploy:
           resources:

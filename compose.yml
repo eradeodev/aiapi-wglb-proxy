@@ -29,7 +29,6 @@ services:
       - HUB_ENDPOINT=${HUB_ENDPOINT}
       - HUB_PUB_KEY=${HUB_PUB_KEY}
       - DEFAULT_PEER_PRIV_KEY=${DEFAULT_PEER_PRIV_KEY}
-      - OLLAMA_HOST=0.0.0.0
       - OLLAMA_KEEP_ALIVE=24h
     restart: always
 
@@ -45,7 +44,6 @@ services:
       - HUB_ENDPOINT=${HUB_ENDPOINT}
       - HUB_PUB_KEY=${HUB_PUB_KEY}
       - DEFAULT_PEER_PRIV_KEY=${DEFAULT_PEER_PRIV_KEY}
-      - OLLAMA_HOST=0.0.0.0
       - OLLAMA_KEEP_ALIVE=24h
     restart: always
 
