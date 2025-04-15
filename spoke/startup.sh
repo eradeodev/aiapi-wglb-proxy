@@ -116,9 +116,26 @@ while true; do
 done
 ) &
 
-# Start chunker server in background
-echo "Starting chunker server"
-cd /app/chunker_server && conda run -n py312 gunicorn --bind 0.0.0.0:11435 app:app --workers $CHUNKER_WORKERS --access-logfile /proc/1/fd/1 --error-logfile /proc/1/fd/2 &
+# Conditionally start server processes
+if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
+    IFS=',' read -ra enabled_endpoints <<< "$ENABLED_FOR_REQUESTS"
+    for endpoint_config in "${enabled_endpoints[@]}"; do
+        if [[ "$endpoint_config" == *"/v1/embeddings"* ]]; then
+            port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
+            echo "Starting vllm serve for embeddings on port $port"
+            vllm serve "infly/inf-retriever-v1-1.5b" --task embed --max-model-len 1024 --enforce-eager --host 0.0.0.0 --port "$port" &
+        elif [[ "$endpoint_config" == *"/v1/chat/completions"* ]]; then
+            port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
+            echo "Starting vllm serve for completions on port $port"
+            vllm serve "unsloth/DeepSeek-R1-Distill-Qwen-14B-unsloth-bnb-4bit" --task generate --max-model-len 1024 --enforce-eager --host 0.0.0.0 --port "$port" &
+        elif [[ "$endpoint_config" == *"/api/chunk"* ]]; then
+            port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
+            echo "Starting gunicorn serve for chunking on port $port"
+            cd /app/chunker_server && conda run -n py312 gunicorn --bind 0.0.0.0:$port app:app --workers $CHUNKER_WORKERS --access-logfile /proc/1/fd/1 --error-logfile /proc/1/fd/2 &
+        fi
+    done
+fi
 
-vllm serve "infly/inf-retriever-v1-1.5b" --task embed --max-model-len 1024 --enforce-eager --host 0.0.0.0 --port 11433
-#vllm serve "unsloth/DeepSeek-R1-Distill-Qwen-14B-unsloth-bnb-4bit" --task generate --max-model-len 1024 --enforce-eager --host 0.0.0.0 --port 11434
+while true; do
+  sleep 10
+done

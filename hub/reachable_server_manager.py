@@ -30,11 +30,16 @@ class ReachableServerManager():
             # If current duration isn't in schedule, start from the beginning
             return _BACKOFF_SCHEDULE[0]
 
-    def _is_server_reachable(self, server_name, server_url):
+    def _is_server_reachable(self, server_name, server_config):
         """Checks if a server is reachable."""
+        server_url = server_config["url"]
         parsed = urlparse(server_url)
         host = parsed.hostname
-        port = 11433
+        enabled = server_config.get("enabled_for_requests", [])
+
+        first_item = enabled[0]
+        port = first_item.split('/')[0]
+
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(10)
             try:
@@ -108,7 +113,7 @@ class ReachableServerManager():
                     continue # Skip this server for now
 
                 # --- Standard Checks (if not in backoff or backoff expired) ---
-                if self._is_server_reachable(server_name, config["url"]):
+                if self._is_server_reachable(server_name, config):
                     enabled = config.get("enabled_for_requests", [])
                     ASCIIColors.yellow(
                         f"Server {server_name} enabled_for_requests = {enabled} "

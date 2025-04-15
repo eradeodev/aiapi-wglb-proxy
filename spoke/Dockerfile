@@ -38,7 +38,7 @@ RUN conda run -n py312 pip install -r /app/chunker_server/requirements.txt
 WORKDIR /app
 
 # Copy the peer setup and host check scripts
-COPY initial_config.conf create_new_peer.sh check_host.sh /app/
+COPY healthcheck.py initial_config.conf create_new_peer.sh check_host.sh /app/
 
 # Copy chunker_server app.py
 COPY chunker_server/app.py /app/chunker_server/

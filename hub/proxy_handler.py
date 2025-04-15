@@ -266,20 +266,9 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         # Execute the request
         try:
             stream = post_data_dict.get("stream", False) if is_generate_path else False
-            url_to_use = config["url"]
-            parsed_url = urlparse(url_to_use)
-            if path == "/api/chunk":
-                # Replace port section of URL with 11435
-                new_netloc = parsed_url.hostname + ':11435'
-                url_to_use = urlunparse(parsed_url._replace(netloc=new_netloc))
-            elif path == "/v1/chat/completions":
-                # Port should be 11434
-                new_netloc = parsed_url.hostname + ':11434'
-                url_to_use = urlunparse(parsed_url._replace(netloc=new_netloc))
-            elif path == "/v1/embeddings":
-                # Port should be 11433
-                new_netloc = parsed_url.hostname + ':11433'
-                url_to_use = urlunparse(parsed_url._replace(netloc=new_netloc))
+            enabled = config.get("enabled_for_requests", [])
+            matching_item = next((item for item in enabled if path in item), None)
+            url_to_use = config["url"] + matching_item
 
             headers = {
                 'Content-type':'application/json', 
@@ -288,7 +277,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
             response = requests.request(
                 self.command,
-                url_to_use + path,
+                url_to_use,
                 params=get_params,
                 headers=headers,
                 data=current_post_data, # Use current (potentially updated) post data
