@@ -34,7 +34,7 @@ class ReachableServerManager():
         """Checks if a server is reachable."""
         parsed = urlparse(server_url)
         host = parsed.hostname
-        port = parsed.port or (80 if parsed.scheme == "http" else 443)
+        port = 11433
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(10)
             try:
