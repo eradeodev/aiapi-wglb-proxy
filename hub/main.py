@@ -42,7 +42,7 @@ def main():
     server_logger = ServerLogger(args.log_path)
     deactivate_security = args.deactivate_security
 
-    ASCIIColors.red("Ollama Proxy server")
+    ASCIIColors.cyan("Ollama Proxy server")
 
     class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         pass

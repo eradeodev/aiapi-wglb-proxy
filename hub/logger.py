@@ -26,6 +26,11 @@ class ServerLogger:
                 log_entry[key] = value
             if "error" == key and value not in (None, "", [], {}, 0, -1):
                 color = ASCIIColors.RED
+            if "response_status" == key and value not in (None, "", [], {}, 0, -1):
+                if value == 200:
+                    color = ASCIIColors.GREEN
+                else:
+                    color = ASCIIColors.RED
 
         output = json.dumps(log_entry)
         if color:
