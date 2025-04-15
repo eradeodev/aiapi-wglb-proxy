@@ -1,12 +1,11 @@
 import base64
-import json
 import os
 import threading
 import logging
 from flask import Flask, request, jsonify
 import semchunk
 import tiktoken
-from transformers import AutoTokenizer, HfArgumentParser
+from transformers import AutoTokenizer
 
 # --- Configuration ---
 # Maximum concurrent chunking requests allowed per worker process
@@ -51,8 +50,8 @@ def get_tokenizer(tokenizer_name_or_path):
                 logging.error(f"Failed to load tokenizer {tokenizer_name_or_path}: hf {e}, tiktoken {first_exception}")
                 raise ValueError(f"Could not load tokenizer: {tokenizer_name_or_path}") from e
             except Exception as e:
-                logging.error(f"Unexpected error during chunker initialization for '{tokenizer_name}': hf={e}, tiktoken={first_exception}")
-                raise RuntimeError(f"Internal error initializing chunker.") from e
+                logging.error(f"Unexpected error during chunker initialization for '{tokenizer_name_or_path}': hf={e}, tiktoken={first_exception}")
+                raise RuntimeError("Internal error initializing chunker.") from e
         else:
             return tokenizer_cache[tokenizer_name_or_path]
             
@@ -161,7 +160,7 @@ def handle_chunk_request():
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
     except Exception as e:
         # Catch-all for unexpected errors during processing
-        logging.exception("An unexpected error occurred during request processing.") # Log full traceback
+        logging.exception(f"An unexpected error occurred during request processing: {str(e)} ")
         return jsonify({"error": "An unexpected internal server error occurred."}), 500
     finally:
         semaphore.release()

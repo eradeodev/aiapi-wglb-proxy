@@ -56,7 +56,7 @@ function create_new_config {
         exit 1
     fi
 
-    echo "Peer config sent to hub. Waiting 2 seconds for hub processing..."
+    echo "New peer config created and sent to hub. Waiting 2 seconds for hub processing..."
     sleep 2
     # Tear down default Wireguard config and set up new one
     wg-quick down ./initial_config.conf
@@ -70,11 +70,11 @@ else
     create_new_config
 fi
 
-echo "Waiting for connection to 10.123.123.1 via new config..."
+echo "Waiting for connection to 10.123.123.1 via custom config..."
 count=0
 while ! ./check_host.sh 10.123.123.1; do
     ((count++))
-    echo "Waiting for connection to 10.123.123.1 via new config..."
+    echo "Waiting for connection to 10.123.123.1 via custom config..."
     sleep 2
     if [[ $count -eq 6 ]]; then # 6 attempts == 3 minutes at 30 seconds per host check attempt
         echo "couldn't connect. Attempting to retrieve new config..."
@@ -123,11 +123,13 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
         if [[ "$endpoint_config" == *"/v1/embeddings"* ]]; then
             port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
             echo "Starting vllm serve for embeddings on port $port"
-            vllm serve "infly/inf-retriever-v1-1.5b" --task embed --max-model-len 1024 --enforce-eager --host 0.0.0.0 --port "$port" &
+            vllm serve "infly/inf-retriever-v1-1.5b" --task embed --enforce-eager --host 0.0.0.0 --port "$port" &
         elif [[ "$endpoint_config" == *"/v1/chat/completions"* ]]; then
             port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
             echo "Starting vllm serve for completions on port $port"
-            vllm serve "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B" --task generate --max-model-len 1024 --enforce-eager --gpu-memory-utilization 0.8 --enable-reasoning --reasoning-parser deepseek_r1 --max_num_batched_tokens 64 --max_num_seqs 64 --host 0.0.0.0 --port "$port" &
+            mkdir -p /app/models
+            cd /app/models && (test -f DeepSeek-R1-Distill-Qwen-14B-IQ4_XS.gguf || wget https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-14B-IQ4_XS.gguf)
+            vllm serve /app/models/DeepSeek-R1-Distill-Qwen-14B-IQ4_XS.gguf --task generate --max-model-len 9000 --enforce-eager --gpu-memory-utilization 0.99 --enable-reasoning --reasoning-parser deepseek_r1 --host 0.0.0.0 --port "$port" &
         elif [[ "$endpoint_config" == *"/api/chunk"* ]]; then
             port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
             echo "Starting gunicorn serve for chunking on port $port"

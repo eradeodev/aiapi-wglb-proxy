@@ -1,5 +1,5 @@
 from http.server import BaseHTTPRequestHandler
-from urllib.parse import urlparse, urlunparse, parse_qs
+from urllib.parse import urlparse, parse_qs
 
 import requests
 import json
@@ -8,6 +8,8 @@ from ascii_colors import ASCIIColors
 import traceback
 import uuid
 
+
+# @Work @EX TODO support passing token indicating request should be served via runpod
 _GENERATE_PATHS = {"/api/generate", "/api/embed", "/api/chat", "/v1/chat/completions"}
 _PROXY_TIMEOUT = (60, 3600)  # (connect timeout, read timeout)
 _MAX_RETRIES = 3
