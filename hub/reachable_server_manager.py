@@ -202,6 +202,7 @@ class ReachableServerManager():
         reachable_by_path = []
         for server, config in self.reachable_servers_array:
             enabled = config.get("enabled_for_requests", [])
-            if not enabled or path in enabled:
+            match = next((item for item in enabled if path in item))
+            if match:
                 reachable_by_path.append((server, config))
         return reachable_by_path
