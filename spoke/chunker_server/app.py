@@ -167,3 +167,6 @@ def handle_chunk_request():
         semaphore.release()
         logging.info(f"Semaphore released. Request finished. (available: {semaphore._value})")
 
+@app.route('/health', methods=['GET'])
+def handle_health():
+    return '', 200 # Empty response with 200 OK

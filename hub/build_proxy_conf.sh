@@ -6,8 +6,6 @@
 cd /app
 PEERS_DIR="/app/peers"
 OUTPUT_FILE="proxy_config.ini"
-PORT=11434
-
 echo -n "" > "$OUTPUT_FILE"
 
 count=0
@@ -19,7 +17,7 @@ for file in "$PEERS_DIR"/*; do
         if [[ -n "$IP" ]]; then
             SERVER_NAME="${UUID_SERVER_NAME}_$count"
             echo "[$SERVER_NAME]" >> "$OUTPUT_FILE"
-            echo "url = http://$IP:$PORT" >> "$OUTPUT_FILE"
+            echo "url = http://$IP" >> "$OUTPUT_FILE"
             echo "enabled_for_requests = $ENABLED" >> "$OUTPUT_FILE"
             echo "" >> "$OUTPUT_FILE"
             ((count++))

@@ -241,83 +241,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         ASCIIColors.yellow(f"Unexpected post_data type: {type(post_data)} - request_uuid = {self.request_uuid}")
         return {}
 
-    def _handle_model_check_and_pull(self, server_name, config, post_data):
-        """
-        Checks model availability, attempts auto-pull if missing.
-        Returns potentially updated post_data (bytes), or None if model unavailable/pull failed.
-        """
-        post_data_dict = self._decode_post_data(post_data)
-        model = post_data_dict.get("model")
-
-        if not model:
-            return post_data # Proceed if no model specified
-
-        server_url = config["url"]
-        try:
-            # Use cached models if available and recent enough, otherwise refresh
-            # Note: get_server_available_models already updates the cache
-            # We rely on get_reachable_servers having populated this recently
-            available_models = config.get("available_models", [])
-            matched_model = self.match_model(model, available_models)
-            if matched_model:
-                ASCIIColors.yellow(f"{server_name} found matched model for '{model}': '{matched_model}' - request_uuid = {self.request_uuid}")
-                if model != matched_model:
-                    post_data_dict["model"] = matched_model
-                    return json.dumps(post_data_dict).encode("utf-8")
-                return post_data # Exact or already matched
-
-            ASCIIColors.yellow(f"Model '{model}' not on {server_name}. Available: {available_models}. Auto-pulling... request_uuid = {self.request_uuid}")
-            # Log the pull attempt
-            self.request_logger.log(
-                event="model_pull_attempt",
-                server=server_name,
-                model=model,
-                message=f"Attempting pull for model {model}",
-                request_uuid=self.request_uuid
-            )
-            pull_response = requests.post(
-                f"{server_url}/api/pull",
-                json={"model": model},
-                timeout=_PROXY_TIMEOUT,
-            )
-            ASCIIColors.yellow(f"{server_name} pull response: {pull_response.status_code} - {pull_response.text[:200]}... request_uuid = {self.request_uuid}")
-            # Log pull response
-            self.request_logger.log(
-                event="model_pull_response",
-                server=server_name,
-                model=model,
-                response_status=pull_response.status_code,
-                message=f"Pull response received for model {model}",
-                request_uuid=self.request_uuid
-            )
-            pull_response.raise_for_status()
-
-            # Re-check models after pull
-            available_models = self.reachable_server_manager.get_server_available_models(server_name, server_url, self.request_uuid)
-            config["available_models"] = available_models
-            matched_model = self.match_model(model, available_models)
-
-            if matched_model:
-                ASCIIColors.green(f"Successfully pulled and matched model '{model}' ({matched_model}) on {server_name}. request_uuid = {self.request_uuid}")
-                post_data_dict["model"] = matched_model
-                return json.dumps(post_data_dict).encode("utf-8")
-            else:
-                ASCIIColors.red(f"Model '{model}' still not available after pull on {server_name}. Available: {available_models}. request_uuid = {self.request_uuid}")
-                return None # Signal failure
-
-        except Exception as e:
-            ASCIIColors.red(f"Failed during model check/pull for '{model}' on {server_name}: {e} - request_uuid = {self.request_uuid}")
-            # Log the failure
-            self.request_logger.log(
-                event="model_check_pull_error",
-                server=server_name,
-                model=model,
-                error=str(e),
-                message="Error during model check or pull",
-                request_uuid=self.request_uuid
-            )
-            return None # Signal failure
-
     def _attempt_request_on_server(self, server_name, config, path, get_params, post_data, client_ip):
         """
         Attempts a single request to a specific server. Returns True if handled, False if retry needed.
@@ -330,17 +253,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         post_data_dict = {}
         current_post_data = post_data # Keep track of potentially modified post data
 
-        # 1. Handle model availability for generate paths
-        if is_generate_path:
-            updated_post_data = self._handle_model_check_and_pull(server_name, config, current_post_data)
-            if updated_post_data is None:
-                self.config_manager.update_server_process_time(server_name)
-                self._log_request_outcome("model_pull_fail", server_name, path, get_params, post_data, client_ip, start_time, error="Model check/pull failed", queue_size=queue_size, request_uuid=self.request_uuid)
-                return False # Signal failure, try next server
-            current_post_data = updated_post_data # Use potentially updated data
-            post_data_dict = self._decode_post_data(current_post_data) # Decode again if updated
-
-        # 2. Log initial attempt (if applicable) and prepare request
+        # Log initial attempt (if applicable) and prepare request
         if is_generate_path and load_tracker:
             # Log the *actual* post data being sent (potentially updated)
             self._log_request_outcome(f"{log_event_prefix}_request", server_name, path, get_params, current_post_data, client_ip, None, queue_size=queue_size, request_uuid=self.request_uuid)
@@ -350,14 +263,22 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         error = None
         request_handled = False # Flag indicates response sent or non-retryable error
 
-        # 3. Execute the request
+        # Execute the request
         try:
             stream = post_data_dict.get("stream", False) if is_generate_path else False
             url_to_use = config["url"]
+            parsed_url = urlparse(url_to_use)
             if path == "/api/chunk":
                 # Replace port section of URL with 11435
-                parsed_url = urlparse(url_to_use)
                 new_netloc = parsed_url.hostname + ':11435'
+                url_to_use = urlunparse(parsed_url._replace(netloc=new_netloc))
+            elif path == "/v1/chat/completions":
+                # Port should be 11434
+                new_netloc = parsed_url.hostname + ':11434'
+                url_to_use = urlunparse(parsed_url._replace(netloc=new_netloc))
+            elif path == "/v1/embeddings":
+                # Port should be 11433
+                new_netloc = parsed_url.hostname + ':11433'
                 url_to_use = urlunparse(parsed_url._replace(netloc=new_netloc))
 
             headers = {
@@ -383,7 +304,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             self._log_request_outcome(f"{log_event_prefix}_done", server_name, path, get_params, current_post_data, client_ip, start_time, response=response, queue_size=queue_size, request_uuid=self.request_uuid)
             request_handled = True
 
-        # 4. Handle specific exceptions
+        # Handle specific exceptions
         except requests.exceptions.HTTPError as e:
             error = e
             response = e.response
@@ -410,7 +331,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             ASCIIColors.yellow(f"An unexpected error occurred while routing to {server_name}: {e} - request_uuid = {self.request_uuid}")
             self._log_request_outcome("routing_error", server_name, path, get_params, current_post_data, client_ip, start_time, error=error, queue_size=queue_size, request_uuid=self.request_uuid)
 
-        # 5. Finalize attempt
+        # Finalize attempt
         finally:
             self.config_manager.update_server_process_time(server_name)
             if is_generate_path and load_tracker:
@@ -421,76 +342,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
         return request_handled
 
-    def _handle_pull_broadcast(self, path, get_params, post_data, reachable_servers, client_ip):
-        """Handles /api/pull by broadcasting."""
-        ASCIIColors.magenta(f"Broadcasting /api/pull request to {len(reachable_servers)} servers. request_uuid = {self.request_uuid}")
-        first_response_sent = False
-        overall_start_time = time.time() # For final log if needed
-
-        for server_name, config in reachable_servers:
-            start_time = time.time()
-            response = None
-            error = None
-            try:
-                response = requests.request(
-                    self.command,
-                    config["url"] + path,
-                    params=get_params,
-                    data=post_data,
-                    timeout=_PROXY_TIMEOUT,
-                )
-                # Log immediately, check status before sending
-                self._log_request_outcome("pull_attempt_done", server_name, path, get_params, post_data, client_ip, start_time, response=response, request_uuid=self.request_uuid)
-
-                if not first_response_sent:
-                    try:
-                        response.raise_for_status() # Check status ONLY for the one we send back
-                        self._send_response(response) # Send first success back
-                        first_response_sent = True
-                        self.active_server_name = server_name # Mark which server gave the primary response
-                        # Log that this was the primary success
-                        self._log_request_outcome("pull_primary_success", server_name, path, get_params, post_data, client_ip, start_time, response=response, request_uuid=self.request_uuid)
-
-                    except requests.exceptions.HTTPError as http_err:
-                        # Log the error for this server even if we don't send it back yet
-                        ASCIIColors.yellow(f"Pull HTTP error from {server_name} (not sent to client unless first): {http_err} - request_uuid = {self.request_uuid}")
-                        # Log separately that this specific server failed, but wasn't the primary failure yet
-                        self._log_request_outcome("pull_attempt_fail", server_name, path, get_params, post_data, client_ip, start_time, response=response, error=http_err, request_uuid=self.request_uuid)
-
-            except requests.exceptions.RequestException as e:
-                error = e
-                response = getattr(e, 'response', None)
-                ASCIIColors.yellow(f"Error pulling from {server_name}: {e} - request_uuid = {self.request_uuid}")
-                self._log_request_outcome("pull_error", server_name, path, get_params, post_data, client_ip, start_time, response=response, error=error, request_uuid=self.request_uuid)
-            except Exception as e:
-                error = e
-                ASCIIColors.red(f"Unexpected error during pull broadcast to {server_name}: {e} - request_uuid = {self.request_uuid}")
-                self._log_request_outcome("pull_error", server_name, path, get_params, post_data, client_ip, start_time, error=f"Broadcast loop error: {e}", request_uuid=self.request_uuid)
-            finally:
-                self.config_manager.update_server_process_time(server_name)
-
-
-        if not first_response_sent:
-            error_message = f"Pull request broadcast failed or returned errors on all reachable servers. request_uuid = {self.request_uuid}"
-            ASCIIColors.red(error_message)
-            self._send_response_code(503, error_message)
-            self.end_headers()
-            # --- Use _log_request_outcome for final broadcast failure ---
-            self._log_request_outcome(
-                event="pull_broadcast_failed",
-                server_name="All",
-                path=path,
-                get_params=get_params,
-                post_data=post_data,
-                client_ip=client_ip,
-                start_time=overall_start_time, # Log duration of whole broadcast attempt
-                error=error_message,
-                access="Denied", # Denied because no server could fulfill it
-                request_uuid=self.request_uuid
-            )
-        # Indicate the /api/pull path has been fully handled here
-        return True # Signal handled regardless of success/fail
-
     # --- Main Method ---
 
     def _route_request(self, path, get_params, post_data, reachable_servers):
@@ -498,11 +349,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         Routes the request to a proxy server with retries.
         """
         client_ip, _ = self.client_address
-
-        # Handle /api/pull broadcast separately
-        if path == "/api/pull":
-            self._handle_pull_broadcast(self.request_path, self.request_get_params, self.request_post_data, reachable_servers, client_ip)
-            return
 
         # --- Standard request routing with retries ---
         attempt = 0
@@ -543,13 +389,13 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                     # Success logged within _attempt_request_on_server
                     return # Exit routing function
 
-                # If request was not handled (e.g., 5xx error, connection error, model pull fail)
+                # If request was not handled (e.g., 5xx error, connection error)
                 ASCIIColors.yellow(f"{path} request attempt on server '{server_name}' failed. Trying next available server or retrying... request_uuid = {self.request_uuid}")
                 servers_to_remove_from_next_attempt.append(server_name)
                 # Loop continues to the next server in *this* attempt's list
 
             # After trying all servers in current_servers_for_attempt for this attempt:
-            # Prepare the list for the *next* attempt by removing servers that failed irrecoverably (e.g. model pull failed)
+            # Prepare the list for the *next* attempt by removing servers that failed irrecoverably
             # or had temporary issues (5xx, connection errors) in this round.
             # A simple approach is to just refresh the list entirely for the next attempt.
             if attempt < _MAX_RETRIES:

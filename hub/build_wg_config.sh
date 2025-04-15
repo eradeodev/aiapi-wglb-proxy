@@ -1,4 +1,3 @@
-# file: /base-eradeo-pool/data/base-eradeo/projects/eradeo/eradeoroot/ollama-wglb-proxy/hub/build_wg_config.sh
 #!/bin/bash
 
 PEERS_DIR="/app/peers"
