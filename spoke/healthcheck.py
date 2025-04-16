@@ -17,8 +17,8 @@ for endpoint in endpoints:
     try:
         # Example item: ":11434/v1/chat/completions"
         if endpoint.startswith(":"):
-            port_part = endpoint.split("/")[0]  # ":11434"
-            port = port_part.strip(":")        # "11434"
+            port_part = endpoint.split("/")[0]
+            port = port_part.strip(":")
             url = f"http://localhost:{port}/health"
 
             with urllib.request.urlopen(url, timeout=5) as response:

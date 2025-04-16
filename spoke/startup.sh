@@ -129,7 +129,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
             echo "Starting vllm serve for completions on port $port"
             mkdir -p /app/models
             cd /app/models && (test -f DeepSeek-R1-Distill-Qwen-14B-IQ4_XS.gguf || wget https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-14B-IQ4_XS.gguf)
-            vllm serve /app/models/DeepSeek-R1-Distill-Qwen-14B-IQ4_XS.gguf --task generate --max-model-len 9000 --enforce-eager --gpu-memory-utilization 0.99 --enable-reasoning --reasoning-parser deepseek_r1 --host 0.0.0.0 --port "$port" &
+            vllm serve /app/models/DeepSeek-R1-Distill-Qwen-14B-IQ4_XS.gguf --task generate --max-model-len 16000 --enforce-eager --gpu-memory-utilization 0.90 --enable-reasoning --reasoning-parser deepseek_r1 --host 0.0.0.0 --port "$port" &
         elif [[ "$endpoint_config" == *"/api/chunk"* ]]; then
             port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
             echo "Starting gunicorn serve for chunking on port $port"

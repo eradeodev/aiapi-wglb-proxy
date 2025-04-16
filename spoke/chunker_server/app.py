@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify
 import semchunk
 import tiktoken
 from transformers import AutoTokenizer
+import time
 
 # --- Configuration ---
 # Maximum concurrent chunking requests allowed per worker process
@@ -24,6 +25,13 @@ tokenizer_lock = threading.Lock() # Protects access to tokenizer_cache
 logging = logging.getLogger('gunicorn.error')
 
 # --- Helper Functions ---
+RED = "\033[91m"
+YELLOW = "\033[93m"
+GREEN = "\033[92m"
+CYAN = "\033[96m"
+MAGENTA = "\033[95m"
+RESET = "\033[0m"
+
 
 def get_tokenizer(tokenizer_name_or_path):
     """Loads a tokenizer, caching it for efficiency."""
@@ -39,7 +47,7 @@ def get_tokenizer(tokenizer_name_or_path):
                 tokenizer_cache[tokenizer_name_or_path] = tokenizer
                 return tokenizer
             except Exception as ignored:
-                logging.error(f"could not load as tiktoken tokenizer name: {ignored}")
+                logging.error(f"{RED}could not load as tiktoken tokenizer name: {ignored}{RESET}")
                 first_exception = ignored
             
             try:
@@ -47,10 +55,10 @@ def get_tokenizer(tokenizer_name_or_path):
                 tokenizer_cache[tokenizer_name_or_path] = tokenizer
                 return tokenizer
             except Exception as e:
-                logging.error(f"Failed to load tokenizer {tokenizer_name_or_path}: hf {e}, tiktoken {first_exception}")
+                logging.error(f"{RED}Failed to load tokenizer {tokenizer_name_or_path}: hf {e}, tiktoken {first_exception}{RESET}")
                 raise ValueError(f"Could not load tokenizer: {tokenizer_name_or_path}") from e
             except Exception as e:
-                logging.error(f"Unexpected error during chunker initialization for '{tokenizer_name_or_path}': hf={e}, tiktoken={first_exception}")
+                logging.error(f"{RED}Unexpected error during chunker initialization for '{tokenizer_name_or_path}': hf={e}, tiktoken={first_exception}{RESET}")
                 raise RuntimeError("Internal error initializing chunker.") from e
         else:
             return tokenizer_cache[tokenizer_name_or_path]
@@ -153,14 +161,14 @@ def handle_chunk_request():
         result = process_chunking_request(data)
         return jsonify(result), 200
     except ValueError as e:
-        logging.warning(f"Bad Request: {e}")
+        logging.warning(f"{RED}Bad Request: {e}{RESET}")
         return jsonify({"error": f"Bad Request: {str(e)}"}), 400
     except RuntimeError as e:
-        logging.error(f"Internal Server Error: {e}")
+        logging.error(f"{RED}Internal Server Error: {e}{RESET}")
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
     except Exception as e:
         # Catch-all for unexpected errors during processing
-        logging.exception(f"An unexpected error occurred during request processing: {str(e)} ")
+        logging.exception(f"{RED}An unexpected error occurred during request processing: {str(e)} {RESET}")
         return jsonify({"error": "An unexpected internal server error occurred."}), 500
     finally:
         semaphore.release()
