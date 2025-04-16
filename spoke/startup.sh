@@ -119,22 +119,83 @@ done
 # Conditionally start server processes
 if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
     IFS=',' read -ra enabled_endpoints <<< "$ENABLED_FOR_REQUESTS"
+
+    # Read total GPU memory available into an integer
+    # Function to get total GPU memory in MB for a specific GPU ID (default 0)
+    get_total_gpu_memory_mb() {
+        local gpu_id="${1:-0}"
+        nvidia-smi --query-gpu=memory.total --format=csv,noheader --id="$gpu_id" | awk -F' ' '{print $1}'
+    }
+
+    # Function to start vllm server
+    start_vllm_server() {
+        local model="$1"
+        local task="$2"
+        local port="$3"
+        local memory_fraction="$4"
+        local extra_args="$5"
+        echo "Starting vllm serve for $task on port $port (GPU $gpu_id) with memory fraction $memory_fraction"
+        CUDA_LAUNCH_BLOCKING=1 vllm serve "$model" --task "$task" --host 0.0.0.0 --port "$port" --gpu-memory-utilization "$memory_fraction" $extra_args &
+    }
+
+    # Function to start gunicorn server
+    start_gunicorn_server() {
+        local port="$1"
+        echo "Starting gunicorn serve for chunking on port $port"
+        cd /app/chunker_server
+        conda run -n py312 gunicorn --log-level debug --enable-stdio-inheritance --bind 0.0.0.0:$port app:app --workers "$CHUNKER_WORKERS" --access-logfile /proc/1/fd/1 --error-logfile /proc/1/fd/2 &
+    }
+
+    total_gpu_memory_mb=$(get_total_gpu_memory_mb)
+    remaining_memory_mb="$total_gpu_memory_mb"
+
+    started_completions=false
+    started_embeddings=false
+
+    # Prioritize /v1/chat/completions
+    for endpoint_config in "${enabled_endpoints[@]}"; do
+        if [[ "$endpoint_config" == *"/v1/chat/completions"* ]]; then
+            port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
+            echo "Attempting to start vllm serve for completions on port $port"
+            completion_memory_needed_mb=19000
+            if [[ "$remaining_memory_mb" -gt "$completion_memory_needed_mb" ]]; then
+                completion_memory_fraction_float=$(awk "BEGIN{printf \"%.4f\", $completion_memory_needed_mb / $total_gpu_memory_mb}")
+                echo "Starting vllm serve for completions on port $port with fraction $completion_memory_fraction_float"
+                # unsloth/DeepSeek-R1-Distill-Qwen-14B-bnb-4bit --enable-reasoning --reasoning-parser deepseek_r1 --quantization bitsandbytes --load-format bitsandbytes --enable-chunked-prefill /// this worked @ 16384
+                start_vllm_server "deepcogito/cogito-v1-preview-llama-3B" generate "$port" "$completion_memory_fraction_float" "--max_model_len 65536 --max-model-len 65536 --enable-chunked-prefill"
+                remaining_memory_mb=$((remaining_memory_mb - completion_memory_needed_mb))
+                started_completions=true
+            else
+                echo "Not enough GPU memory to start completions server (needed: ${completion_memory_needed_mb}MB, available: ${remaining_memory_mb}MB)"
+            fi
+            break # Prioritize and start only one completions server
+        fi
+    done
+
+    # Then do /v1/embeddings if enough remains
     for endpoint_config in "${enabled_endpoints[@]}"; do
         if [[ "$endpoint_config" == *"/v1/embeddings"* ]]; then
             port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
-            echo "Starting vllm serve for embeddings on port $port"
-            vllm serve "infly/inf-retriever-v1-1.5b" --task embed --enforce-eager --host 0.0.0.0 --port "$port" &
-        elif [[ "$endpoint_config" == *"/v1/chat/completions"* ]]; then
+            echo "Attempting to start vllm serve for embeddings on port $port"
+            embedding_memory_needed_mb=4000
+            if [[ "$remaining_memory_mb" -gt "$embedding_memory_needed_mb" ]]; then
+                embedding_memory_fraction_float=$(awk "BEGIN{printf \"%.4f\", $embedding_memory_needed_mb / $total_gpu_memory_mb}")
+                echo "Starting vllm serve for embeddings on port $port with fraction $embedding_memory_fraction_float"
+                start_vllm_server "infly/inf-retriever-v1-1.5b" embed "$port" "$embedding_memory_fraction_float"
+                remaining_memory_mb=$((remaining_memory_mb - embedding_memory_needed_mb))
+                started_embeddings=true
+            else
+                echo "Not enough remaining GPU memory to start embeddings server (needed: ${embedding_memory_needed_mb}MB, available: ${remaining_memory_mb}MB)"
+            fi
+            break # Start only one embeddings server
+        fi
+    done
+
+    # Start chunker servers regardless of vllm status
+    for endpoint_config in "${enabled_endpoints[@]}"; do
+        if [[ "$endpoint_config" == *"/api/chunk"* ]]; then
             port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
-            echo "Starting vllm serve for completions on port $port"
-            mkdir -p /app/models
-            cd /app/models && (test -f DeepSeek-R1-Distill-Qwen-14B-IQ4_XS.gguf || wget https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-14B-IQ4_XS.gguf)
-            vllm serve /app/models/DeepSeek-R1-Distill-Qwen-14B-IQ4_XS.gguf --task generate --max-model-len 16000 --enforce-eager --gpu-memory-utilization 0.90 --enable-reasoning --reasoning-parser deepseek_r1 --host 0.0.0.0 --port "$port" &
-        elif [[ "$endpoint_config" == *"/api/chunk"* ]]; then
-            port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
-            echo "Starting gunicorn serve for chunking on port $port"
-            cd /app/chunker_server
-            conda run -n py312 gunicorn --log-level debug --enable-stdio-inheritance --bind 0.0.0.0:$port app:app --workers $CHUNKER_WORKERS --access-logfile /proc/1/fd/1 --error-logfile /proc/1/fd/2 &
+            start_gunicorn_server "$port"
         fi
     done
 fi
