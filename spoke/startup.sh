@@ -135,7 +135,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
         local memory_fraction="$4"
         local extra_args="$5"
         echo "Starting vllm serve for $task on port $port (GPU $gpu_id) with memory fraction $memory_fraction"
-        CUDA_LAUNCH_BLOCKING=1 vllm serve "$model" --task "$task" --host 0.0.0.0 --port "$port" --gpu-memory-utilization "$memory_fraction" $extra_args &
+        PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True vllm serve "$model" --task "$task" --host 0.0.0.0 --port "$port" --gpu-memory-utilization "$memory_fraction" $extra_args &
     }
 
     # Function to start gunicorn server
@@ -157,12 +157,15 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
         if [[ "$endpoint_config" == *"/v1/chat/completions"* ]]; then
             port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
             echo "Attempting to start vllm serve for completions on port $port"
-            completion_memory_needed_mb=19000
+            completion_memory_needed_mb=10000
             if [[ "$remaining_memory_mb" -gt "$completion_memory_needed_mb" ]]; then
                 completion_memory_fraction_float=$(awk "BEGIN{printf \"%.4f\", $completion_memory_needed_mb / $total_gpu_memory_mb}")
                 echo "Starting vllm serve for completions on port $port with fraction $completion_memory_fraction_float"
-                # unsloth/DeepSeek-R1-Distill-Qwen-14B-bnb-4bit --enable-reasoning --reasoning-parser deepseek_r1 --quantization bitsandbytes --load-format bitsandbytes --enable-chunked-prefill /// this worked @ 16384
-                start_vllm_server "deepcogito/cogito-v1-preview-llama-3B" generate "$port" "$completion_memory_fraction_float" "--max_model_len 65536 --max-model-len 65536 --enable-chunked-prefill"
+                mkdir -p /app/models
+                cd /app/models
+                test -f DeepSeek-R1-Distill-Qwen-14B-Q2_K_L.gguf || wget https://huggingface.co/unsloth/DeepSeek-R1-Distill-Qwen-14B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-14B-Q2_K_L.gguf
+                # unsloth/DeepSeek-R1-Distill-Qwen-14B-bnb-4bit --enable-reasoning --reasoning-parser deepseek_r1 --quantization bitsandbytes --load-format bitsandbytes --enable-chunked-prefill --max-num-seqs 512 /// this worked @ 16384 (--max-num-seqs 512 WASNT set, could help), and according to https://huggingface.co/spaces/NyxKrage/LLM-Model-VRAM-Calculator using GGUF and Q4_K_M it should support 46080 context size
+                start_vllm_server "/app/models/DeepSeek-R1-Distill-Qwen-14B-Q2_K_L.gguf" generate "$port" "$completion_memory_fraction_float" "--tokenizer unsloth/DeepSeek-R1-Distill-Qwen-14B --max_model_len 16384 --max-model-len 16384 --enable-chunked-prefill --max-num-seqs 1 --enforce-eager" # --enable-chunked-prefill oddly necessary to avoid OOM issues with this particular model serve setup
                 remaining_memory_mb=$((remaining_memory_mb - completion_memory_needed_mb))
                 started_completions=true
             else
