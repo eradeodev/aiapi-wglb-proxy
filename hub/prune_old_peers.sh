@@ -19,7 +19,7 @@ INACTIVE_PEERS=()
 while read -r PEER_KEY; do
     HANDSHAKE_TIME=$(wg show hub-wg latest-handshakes | grep "$PEER_KEY" | awk '{print $2}')
     # Ignore default peer
-    echo "Peer key == $PEER_KEY"
+    echo "Peer key == $PEER_KEY ; default peer key == $DEFAULT_PEER_PUB_KEY"
     if [ "$PEER_KEY" = "$DEFAULT_PEER_PUB_KEY" ]; then
         echo "Ignoring $PEER_KEY as it matches default peer key..."
         continue
