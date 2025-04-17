@@ -19,20 +19,12 @@ RUN mkdir -p $MINICONDA_PATH && \
     bash $MINICONDA_PATH/miniconda.sh -b -u -p $MINICONDA_PATH && \
     rm $MINICONDA_PATH/miniconda.sh
 
-# Add Conda to PATH
-ENV PATH $MINICONDA_PATH/bin:$PATH
-
-# Initialize Conda, create the environment, and activate it in one step
-RUN /root/miniconda3/bin/conda init bash && \
-    conda create -n py312 python=3.12 -y && \
-    echo "conda activate py312" >> /root/.bashrc
-
-RUN conda run -n py312 pip install vllm
-
+# Create conda env
+RUN /root/miniconda3/bin/conda create -n py312 python=3.12 -y
 
 # Copy chunker_server requirements and install them
 COPY chunker_server/requirements.txt /app/chunker_server/
-RUN conda run -n py312 pip install -r /app/chunker_server/requirements.txt
+RUN /root/miniconda3/bin/conda run -n py312 pip install -r /app/chunker_server/requirements.txt
 
 # Set the working directory
 WORKDIR /app

@@ -143,7 +143,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
         local port="$1"
         echo "Starting gunicorn serve for chunking on port $port"
         cd /app/chunker_server
-        conda run -n py312 gunicorn --log-level debug --enable-stdio-inheritance --bind 0.0.0.0:$port app:app --workers "$CHUNKER_WORKERS" --access-logfile /proc/1/fd/1 --error-logfile /proc/1/fd/2 &
+        /root/miniconda3/bin/conda run -n py312 gunicorn --log-level debug --enable-stdio-inheritance --bind 0.0.0.0:$port app:app --workers "$CHUNKER_WORKERS" --access-logfile /proc/1/fd/1 --error-logfile /proc/1/fd/2 &
     }
 
     total_gpu_memory_mib=$(get_total_gpu_memory_mib)
