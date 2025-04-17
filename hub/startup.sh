@@ -30,6 +30,7 @@ chmod +x /app/prune_old_peers.sh
 # Add peer pruning cron job
 echo "* * * * * /app/prune_old_peers.sh >> /proc/1/fd/1 2>> /proc/1/fd/2" > /etc/cron.d/peer_prune
 chmod 0644 /etc/cron.d/peer_prune
+crontab /etc/cron.d/peer_prune
 
 # Start cron
 echo "Starting cron"
