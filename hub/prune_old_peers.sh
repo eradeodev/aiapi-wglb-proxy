@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo "@ prune_old_peers.sh"
+
 # Define file for tracking inactive peers
 cd /app || exit 1 # Exit if we can't change directory
 INACTIVE_PEERS_FILE="/app/logs/wg_inactive_peers.txt"
