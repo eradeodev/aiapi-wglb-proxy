@@ -45,6 +45,5 @@ services:
 
 volumes:
   peers:
-
   configs:
   models:
