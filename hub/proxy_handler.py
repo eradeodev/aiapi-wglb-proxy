@@ -27,6 +27,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
     request_get_params = None
     request_post_data = None
     user = 'unknown' # Initialize user
+    client_real_ip = None
     active_server_name = 'unset_server'
     active_server_queue_size = -1
     request_uuid = None # Initialize request_uuid
@@ -46,7 +47,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         self.request_logger.log(
             event="response_sent_code_only", # Differentiate event slightly
             user=getattr(self, 'user', 'unknown'),
-            ip_address=self.client_address[0],
+            ip_address=self.client_real_ip,
             access="Authorized" if getattr(self, 'user', 'unknown') != 'unknown' else 'Denied',
             server=server_log_info,
             nb_queued_requests_on_server=queue_size if isinstance(queue_size, int) else -1,
@@ -85,7 +86,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                  path=getattr(self, 'request_path', 'unknown'),
                  get_params=getattr(self, 'request_get_params', {}),
                  post_data=getattr(self, 'request_post_data', b''),
-                 client_ip=self.client_address[0],
+                 client_ip=self.client_real_ip,
                  start_time=None, # No start time available here
                  response=response, # Pass the original response
                  error=f"Error writing response body: {e}",
@@ -133,7 +134,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         else:
             authorized, user = self._validate_user()
             self.user = user # Store validated or attempted user
-            client_ip, _ = self.client_address
             if authorized:
                 return True
             else:
@@ -142,7 +142,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 self.request_logger.log(
                     event="rejected",
                     user=user,
-                    ip_address=client_ip,
+                    ip_address=self.client_real_ip,
                     access="Denied",
                     server="None",
                     nb_queued_requests_on_server=-1,
@@ -341,8 +341,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         """
         Routes the request to a proxy server with retries.
         """
-        client_ip, _ = self.client_address
-
         # --- Standard request routing with retries ---
         attempt = 0
         tried_servers_overall = set()
@@ -374,7 +372,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 # active_server context is set within _attempt_request_on_server on success
                 ASCIIColors.cyan(f"Attempt {attempt}/{_MAX_RETRIES}: Trying server '{server_name}' for path '{path}'... request_uuid = {self.request_uuid}")
                 request_handled = self._attempt_request_on_server(
-                    server_name, config, path, get_params, post_data, client_ip
+                    server_name, config, path, get_params, post_data, self.client_real_ip
                 )
 
                 if request_handled:
@@ -415,7 +413,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             path=path,
             get_params=get_params,
             post_data=post_data,
-            client_ip=client_ip,
+            client_ip=self.client_real_ip,
             start_time=overall_start_time, # Log duration for the entire routing attempt
             error=retry_failed_message,
             access="Denied", # Ultimately denied access to service
@@ -433,7 +431,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         self.request_uuid = str(uuid.uuid4())
 
         start_time = time.time()
-        client_ip, _ = self.client_address
+        self.client_real_ip = self.headers.get('X-Real-IP')
         access_status = "Denied" # Default access status for logging
 
         try:
@@ -459,7 +457,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 self.request_logger.log(
                     event="error_no_servers",
                     user=self.user,
-                    ip_address=client_ip,
+                    ip_address=self.client_real_ip,
                     access=access_status, # Should be Authorized if past security
                     server="None",
                     nb_queued_requests_on_server=-1,
@@ -498,7 +496,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 path=getattr(self, 'request_path', 'unknown'),
                 get_params=getattr(self, 'request_get_params', {}),
                 post_data=getattr(self, 'request_post_data', b''),
-                client_ip=client_ip,
+                client_ip=self.client_real_ip,
                 start_time=start_time, # Log duration until error
                 error=f"Unexpected handler error: {e}",
                 queue_size=getattr(self, 'active_server_queue_size', -1),
