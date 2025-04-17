@@ -16,42 +16,35 @@ services:
       - HUB_PRIV_KEY=${HUB_PRIV_KEY}
       - DEFAULT_PEER_PUB_KEY=${DEFAULT_PEER_PUB_KEY}
 
-
-  spoke1:
+  spoke:
     build: ./spoke
-    container_name: spoke1
+    deploy:
+      replicas: 2
+    pull_policy: always
+    restart: always
     volumes:
       - configs:/app/wg-configs
-      - ollama:/root/.ollama
+      - ~/.cache/huggingface:/root/.cache/huggingface
+      - models:/app/models
+    healthcheck:
+      test: ["CMD", "python3", "/app/healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     cap_add:
+      # gives the container advanced control over networking, to ensure it can configure for the internal VPN
       - NET_ADMIN
     environment:
       - HUB_ENDPOINT=${HUB_ENDPOINT}
       - HUB_PUB_KEY=${HUB_PUB_KEY}
       - DEFAULT_PEER_PRIV_KEY=${DEFAULT_PEER_PRIV_KEY}
-      - OLLAMA_KEEP_ALIVE=24h
-    restart: always
-
-  spoke2:
-    build: ./spoke
-    container_name: spoke2
-    volumes:
-      - configs2:/app/wg-configs
-      - ollama2:/root/.ollama
-    cap_add:
-      - NET_ADMIN
-    environment:
-      - HUB_ENDPOINT=${HUB_ENDPOINT}
-      - HUB_PUB_KEY=${HUB_PUB_KEY}
-      - DEFAULT_PEER_PRIV_KEY=${DEFAULT_PEER_PRIV_KEY}
-      - OLLAMA_KEEP_ALIVE=24h
-    restart: always
+      - ENABLED_FOR_REQUESTS=${ENABLED_FOR_REQUESTS}
+      - CHUNKER_WORKERS=1
+      - CHUNKER_MAX_CONCURRENT_THREADS_PER_WORKER=4
 
 volumes:
   peers:
 
   configs:
-  ollama:
-
-  configs2:
-  ollama2:
+  models:
