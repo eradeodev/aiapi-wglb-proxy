@@ -20,6 +20,11 @@ fi
 INACTIVE_PEERS=()
 while read -r PEER_KEY; do
     HANDSHAKE_TIME=$(wg show hub-wg latest-handshakes | grep "$PEER_KEY" | awk '{print $2}')
+    # Ignore default peer
+    if [ "$PEER_KEY" = "$DEFAULT_PEER_PUB_KEY" ]; then
+        echo "Ignoring $PEER_KEY as it matches default peer key..."
+        continue
+    fi
     # Add peer if handshake time is 0 or older than 10 minutes
     if [ "$HANDSHAKE_TIME" = "0" ] || [ $((CURRENT_EPOCH - HANDSHAKE_TIME)) -gt 600 ]; then
         INACTIVE_PEERS+=("$PEER_KEY")
