@@ -1,4 +1,4 @@
-An ollama proxy using a hub-and-spoke network model. Uses automatic spoke connection via wireguard.
+An OpenAI API proxy using a hub-and-spoke network model. Uses automatic spoke connection via wireguard.
 
 
 use the compose.yml file to test it out.
@@ -7,7 +7,7 @@ use the compose.yml file to test it out.
 # How it works
 The Hub container should be running on a machine that is accessible by every
 device that is going to be a Spoke. The firewall for this device should allow
-for two ports to get through: one for Wireguard, and one for the Ollama Proxy
+for two ports to get through: one for Wireguard, and one for the Proxy
 Server.
 
 When setting up the Hub, you must generate two sets of public/private keys: One

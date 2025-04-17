@@ -1,5 +1,5 @@
 """
-description: This is a proxy server that adds a security layer to one or multiple ollama servers and routes the requests to the right server in order to minimize the charge of the server.
+description: This is a proxy server that adds a security layer to one or multiple OpenAI API endpoint servers and routes the requests to the right server in order to minimize the charge of the server.
 """
 
 import argparse
@@ -38,7 +38,7 @@ def main():
     server_logger = ServerLogger(args.log_path)
     deactivate_security = args.deactivate_security
 
-    ASCIIColors.cyan("Ollama Proxy server")
+    ASCIIColors.cyan("Eradeo AI API Proxy server")
 
     class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         pass

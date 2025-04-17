@@ -449,7 +449,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             reachable_servers = self.reachable_server_manager.get_reachable_servers_by_path(self.request_path)
 
             if not reachable_servers:
-                not_available_message = f"No reachable Ollama servers available (or all are in backoff) to handle {self.request_path}. request_uuid = {self.request_uuid}"
+                not_available_message = f"No reachable servers available (or all are in backoff) to handle {self.request_path}. request_uuid = {self.request_uuid}"
                 self._send_response_code(503, not_available_message)
                 self.end_headers()
                 ASCIIColors.red(not_available_message)
@@ -461,7 +461,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                     access=access_status, # Should be Authorized if past security
                     server="None",
                     nb_queued_requests_on_server=-1,
-                    error="No reachable Ollama servers (or all in backoff)",
+                    error="No reachable servers (or all in backoff)",
                     request_path=self.request_path,
                     request_params=self.request_get_params,
                     duration = time.time() - start_time, # Log duration up to this point

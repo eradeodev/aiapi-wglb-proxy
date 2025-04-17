@@ -22,14 +22,12 @@ services:
     container_name: spoke1
     volumes:
       - configs:/app/wg-configs
-      - ollama:/root/.ollama
     cap_add:
       - NET_ADMIN
     environment:
       - HUB_ENDPOINT=${HUB_ENDPOINT}
       - HUB_PUB_KEY=${HUB_PUB_KEY}
       - DEFAULT_PEER_PRIV_KEY=${DEFAULT_PEER_PRIV_KEY}
-      - OLLAMA_KEEP_ALIVE=24h
     restart: always
 
   spoke2:
@@ -37,21 +35,15 @@ services:
     container_name: spoke2
     volumes:
       - configs2:/app/wg-configs
-      - ollama2:/root/.ollama
     cap_add:
       - NET_ADMIN
     environment:
       - HUB_ENDPOINT=${HUB_ENDPOINT}
       - HUB_PUB_KEY=${HUB_PUB_KEY}
       - DEFAULT_PEER_PRIV_KEY=${DEFAULT_PEER_PRIV_KEY}
-      - OLLAMA_KEEP_ALIVE=24h
     restart: always
 
 volumes:
   peers:
-
   configs:
-  ollama:
-
   configs2:
-  ollama2:
