@@ -1,7 +1,5 @@
 #!/bin/bash
 
-echo "@ prune_old_peers.sh"
-
 # Define file for tracking inactive peers
 cd /app || exit 1 # Exit if we can't change directory
 INACTIVE_PEERS_FILE="/app/logs/wg_inactive_peers.txt"
@@ -21,6 +19,7 @@ INACTIVE_PEERS=()
 while read -r PEER_KEY; do
     HANDSHAKE_TIME=$(wg show hub-wg latest-handshakes | grep "$PEER_KEY" | awk '{print $2}')
     # Ignore default peer
+    echo "Peer key == $PEER_KEY"
     if [ "$PEER_KEY" = "$DEFAULT_PEER_PUB_KEY" ]; then
         echo "Ignoring $PEER_KEY as it matches default peer key..."
         continue
