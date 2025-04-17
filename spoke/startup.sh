@@ -147,6 +147,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
     }
 
     total_gpu_memory_mib=$(get_total_gpu_memory_mib)
+    echo "Total GPU memory detected: $total_gpu_memory_mib"
     remaining_memory_mib="$total_gpu_memory_mib"
 
     started_completions=false
@@ -157,7 +158,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
         if [[ "$endpoint_config" == *"/v1/chat/completions"* ]]; then
             port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
             echo "Attempting to start vllm serve for completions on port $port"
-            completion_memory_needed_mib=15000
+            completion_memory_needed_mib=16000
             if [[ "$remaining_memory_mib" -gt "$completion_memory_needed_mib" ]]; then
                 completion_memory_fraction_float=$(awk "BEGIN{printf \"%.4f\", $completion_memory_needed_mib / $total_gpu_memory_mib}")
                 echo "Starting vllm serve for completions on port $port with fraction $completion_memory_fraction_float"
@@ -165,7 +166,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
                 #cd /app/models
                 #test -f DeepSeek-R1-Distill-Qwen-14B-Q2_K_L.gguf || wget https://huggingface.co/unsloth/DeepSeek-R1-Distill-Qwen-14B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-14B-Q2_K_L.gguf
                 # unsloth/DeepSeek-R1-Distill-Qwen-14B-bnb-4bit --enforce-eager --enable-reasoning --reasoning-parser deepseek_r1 --quantization bitsandbytes --load-format bitsandbytes --enable-chunked-prefill --max-num-seqs 1 /// this worked @ 16384, and according to https://huggingface.co/spaces/NyxKrage/LLM-Model-VRAM-Calculator using GGUF and Q4_K_M it should support 25600 context size with 15.01GB used total
-                start_vllm_server "unsloth/DeepSeek-R1-Distill-Qwen-14B-bnb-4bit" generate "$port" "$completion_memory_fraction_float" "--tokenizer unsloth/DeepSeek-R1-Distill-Qwen-14B --load-format bitsandbytes --quantization bitsandbytes --enable-chunked-prefill --max_model_len 20480 --max-model-len 20480 --max-num-seqs 1 --enforce-eager --enable-reasoning --reasoning-parser deepseek_r1" # --enable-chunked-prefill oddly necessary to avoid OOM issues with this particular model serve setup
+                start_vllm_server "unsloth/DeepSeek-R1-Distill-Qwen-14B-bnb-4bit" generate "$port" "$completion_memory_fraction_float" "--tokenizer unsloth/DeepSeek-R1-Distill-Qwen-14B --load-format bitsandbytes --quantization bitsandbytes --enable-chunked-prefill --max_model_len 25600 --max-model-len 25600 --max-num-seqs 1 --enforce-eager --enable-reasoning --reasoning-parser deepseek_r1" # --enable-chunked-prefill oddly necessary to avoid OOM issues with this particular model serve setup
                 remaining_memory_mib=$((remaining_memory_mib - completion_memory_needed_mib))
                 started_completions=true
             else
