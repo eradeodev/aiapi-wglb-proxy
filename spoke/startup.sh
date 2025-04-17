@@ -121,8 +121,8 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
     IFS=',' read -ra enabled_endpoints <<< "$ENABLED_FOR_REQUESTS"
 
     # Read total GPU memory available into an integer
-    # Function to get total GPU memory in MB for a specific GPU ID (default 0)
-    get_total_gpu_memory_mb() {
+    # Function to get total GPU memory in MiB for a specific GPU ID (default 0)
+    get_total_gpu_memory_mib() {
         local gpu_id="${1:-0}"
         nvidia-smi --query-gpu=memory.total --format=csv,noheader --id="$gpu_id" | awk -F' ' '{print $1}'
     }
@@ -146,8 +146,8 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
         conda run -n py312 gunicorn --log-level debug --enable-stdio-inheritance --bind 0.0.0.0:$port app:app --workers "$CHUNKER_WORKERS" --access-logfile /proc/1/fd/1 --error-logfile /proc/1/fd/2 &
     }
 
-    total_gpu_memory_mb=$(get_total_gpu_memory_mb)
-    remaining_memory_mb="$total_gpu_memory_mb"
+    total_gpu_memory_mib=$(get_total_gpu_memory_mib)
+    remaining_memory_mib="$total_gpu_memory_mib"
 
     started_completions=false
     started_embeddings=false
@@ -157,19 +157,19 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
         if [[ "$endpoint_config" == *"/v1/chat/completions"* ]]; then
             port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
             echo "Attempting to start vllm serve for completions on port $port"
-            completion_memory_needed_mb=10000
-            if [[ "$remaining_memory_mb" -gt "$completion_memory_needed_mb" ]]; then
-                completion_memory_fraction_float=$(awk "BEGIN{printf \"%.4f\", $completion_memory_needed_mb / $total_gpu_memory_mb}")
+            completion_memory_needed_mib=18000
+            if [[ "$remaining_memory_mib" -gt "$completion_memory_needed_mib" ]]; then
+                completion_memory_fraction_float=$(awk "BEGIN{printf \"%.4f\", $completion_memory_needed_mib / $total_gpu_memory_mib}")
                 echo "Starting vllm serve for completions on port $port with fraction $completion_memory_fraction_float"
-                mkdir -p /app/models
-                cd /app/models
-                test -f DeepSeek-R1-Distill-Qwen-14B-Q2_K_L.gguf || wget https://huggingface.co/unsloth/DeepSeek-R1-Distill-Qwen-14B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-14B-Q2_K_L.gguf
-                # unsloth/DeepSeek-R1-Distill-Qwen-14B-bnb-4bit --enable-reasoning --reasoning-parser deepseek_r1 --quantization bitsandbytes --load-format bitsandbytes --enable-chunked-prefill --max-num-seqs 512 /// this worked @ 16384 (--max-num-seqs 512 WASNT set, could help), and according to https://huggingface.co/spaces/NyxKrage/LLM-Model-VRAM-Calculator using GGUF and Q4_K_M it should support 46080 context size
-                start_vllm_server "/app/models/DeepSeek-R1-Distill-Qwen-14B-Q2_K_L.gguf" generate "$port" "$completion_memory_fraction_float" "--tokenizer unsloth/DeepSeek-R1-Distill-Qwen-14B --max_model_len 16384 --max-model-len 16384 --enable-chunked-prefill --max-num-seqs 1 --enforce-eager" # --enable-chunked-prefill oddly necessary to avoid OOM issues with this particular model serve setup
-                remaining_memory_mb=$((remaining_memory_mb - completion_memory_needed_mb))
+                #mkdir -p /app/models
+                #cd /app/models
+                #test -f DeepSeek-R1-Distill-Qwen-14B-Q2_K_L.gguf || wget https://huggingface.co/unsloth/DeepSeek-R1-Distill-Qwen-14B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-14B-Q2_K_L.gguf
+                # unsloth/DeepSeek-R1-Distill-Qwen-14B-bnb-4bit --enforce-eager --enable-reasoning --reasoning-parser deepseek_r1 --quantization bitsandbytes --load-format bitsandbytes --enable-chunked-prefill --max-num-seqs 1 /// this worked @ 16384, and according to https://huggingface.co/spaces/NyxKrage/LLM-Model-VRAM-Calculator using GGUF and Q4_K_M it should support 59392 context size with 17423.63 MiB used total
+                start_vllm_server "unsloth/DeepSeek-R1-Distill-Qwen-14B-bnb-4bit" generate "$port" "$completion_memory_fraction_float" "--tokenizer unsloth/DeepSeek-R1-Distill-Qwen-14B --load-format bitsandbytes --quantization bitsandbytes --enable-chunked-prefill --max_model_len 59392 --max-model-len 59392 --max-num-seqs 1 --enforce-eager --enable-reasoning --reasoning-parser deepseek_r1" # --enable-chunked-prefill oddly necessary to avoid OOM issues with this particular model serve setup
+                remaining_memory_mib=$((remaining_memory_mib - completion_memory_needed_mib))
                 started_completions=true
             else
-                echo "Not enough GPU memory to start completions server (needed: ${completion_memory_needed_mb}MB, available: ${remaining_memory_mb}MB)"
+                echo "Not enough GPU memory to start completions server (needed: ${completion_memory_needed_mib}MiB, available: ${remaining_memory_mib}MiB)"
             fi
             break # Prioritize and start only one completions server
         fi
@@ -180,15 +180,15 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
         if [[ "$endpoint_config" == *"/v1/embeddings"* ]]; then
             port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
             echo "Attempting to start vllm serve for embeddings on port $port"
-            embedding_memory_needed_mb=4000
-            if [[ "$remaining_memory_mb" -gt "$embedding_memory_needed_mb" ]]; then
-                embedding_memory_fraction_float=$(awk "BEGIN{printf \"%.4f\", $embedding_memory_needed_mb / $total_gpu_memory_mb}")
+            embedding_memory_needed_mib=4000
+            if [[ "$remaining_memory_mib" -gt "$embedding_memory_needed_mib" ]]; then
+                embedding_memory_fraction_float=$(awk "BEGIN{printf \"%.4f\", $embedding_memory_needed_mib / $total_gpu_memory_mib}")
                 echo "Starting vllm serve for embeddings on port $port with fraction $embedding_memory_fraction_float"
                 start_vllm_server "infly/inf-retriever-v1-1.5b" embed "$port" "$embedding_memory_fraction_float"
-                remaining_memory_mb=$((remaining_memory_mb - embedding_memory_needed_mb))
+                remaining_memory_mib=$((remaining_memory_mib - embedding_memory_needed_mib))
                 started_embeddings=true
             else
-                echo "Not enough remaining GPU memory to start embeddings server (needed: ${embedding_memory_needed_mb}MB, available: ${remaining_memory_mb}MB)"
+                echo "Not enough remaining GPU memory to start embeddings server (needed: ${embedding_memory_needed_mib}MiB, available: ${remaining_memory_mib}MiB)"
             fi
             break # Start only one embeddings server
         fi
