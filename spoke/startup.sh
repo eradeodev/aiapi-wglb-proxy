@@ -263,7 +263,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
 
     # Default initial memory needed for completions (this will dynamically increase on restarts)
     # This value is the STARTING point, the actual allocated memory is tracked in completion_memory_needed_mib
-    initial_completion_memory_mib=16000 # Example starting point
+    initial_completion_memory_mib=16000
 
     # === Prioritize and attempt to start /v1/chat/completions ===
     for endpoint_config in "${enabled_endpoints[@]}"; do
@@ -279,9 +279,9 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
                     completions_model="unsloth/DeepSeek-R1-Distill-Qwen-14B-bnb-4bit"
                     completions_task="generate"
                     # Capture the extra args needed for this specific model
-                    completions_extra_args="--tokenizer unsloth/DeepSeek-R1-Distill-Qwen-14B --load-format bitsandbytes --quantization bitsandbytes --max_model_len 25600 --max-model-len 25600 --max-num-seqs 1 --enforce-eager --enable-reasoning --reasoning-parser deepseek_r1"
+                    completions_extra_args="--tokenizer unsloth/DeepSeek-R1-Distill-Qwen-14B --load-format bitsandbytes --quantization bitsandbytes --max_model_len 25600 --max-model-len 25600 --max-num-seqs 1 --max_num_seqs 1 --max-seq-len-to-capture 1024 --enforce-eager --enable-reasoning --reasoning-parser deepseek_r1"
 
-                    completion_memory_fraction_float=$(awk "BEGIN{printf \"%.4f\", $completion_memory_needed_mib / $total_gpu_memory_mib}")
+                    completion_memory_fraction_float=$(awk -v needed="$completion_memory_needed_mib" -v total="$total_gpu_memory_mib" 'BEGIN{printf "%.4f", needed / total}')
                     echo "Attempting to start vllm serve for completions on port $completions_port with fraction $completion_memory_fraction_float (${completion_memory_needed_mib}MiB)..."
 
                     # Start the server and capture its PID
@@ -307,16 +307,16 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
     # === Then attempt to start /v1/embeddings if enough memory remains ===
     for endpoint_config in "${enabled_endpoints[@]}"; do
         if [[ "$endpoint_config" == *"/v1/embeddings"* ]]; then
-            local embeddings_port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
+            embeddings_port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
             echo "Configuration found for embeddings server on port $embeddings_port."
 
-            local embedding_memory_needed_mib=4000 # Fixed allocation for embeddings
+            embedding_memory_needed_mib=3072 # Fixed allocation for embeddings
             if [[ "$remaining_memory_mib" -ge $((embedding_memory_needed_mib + 1024)) ]]; then # Check against remaining + leave 1024 free
-                local embeddings_model="infly/inf-retriever-v1-1.5b"
-                local embeddings_task="embed"
-                local embeddings_extra_args="" # No special args needed for this model usually
+                embeddings_model="infly/inf-retriever-v1-1.5b"
+                embeddings_task="embed"
+                embeddings_extra_args="" # No special args needed for this model usually
 
-                local embedding_memory_fraction_float=$(awk "BEGIN{printf \"%.4f\", $embedding_memory_needed_mib / $total_gpu_memory_mib}")
+                embedding_memory_fraction_float=$(awk -v needed="$embedding_memory_needed_mib" -v total="$total_gpu_memory_mib" 'BEGIN{printf "%.4f", needed / total}')
                 echo "Attempting to start vllm serve for embeddings on port $embeddings_port with fraction $embedding_memory_fraction_float (${embedding_memory_needed_mib}MiB)..."
 
                 start_vllm_server_bg "$embeddings_model" "$embeddings_task" "$embeddings_port" "$embedding_memory_fraction_float" "$embeddings_extra_args"
@@ -337,7 +337,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
     # Note: Chunker does not use GPU memory in this setup, so no memory check needed
     for endpoint_config in "${enabled_endpoints[@]}"; do
         if [[ "$endpoint_config" == *"/api/chunk"* ]]; then
-            local chunker_port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
+            chunker_port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
             echo "Configuration found for chunker server on port $chunker_port."
             start_gunicorn_server_bg "$chunker_port"
             server_pids["chunker"]=$! # Store the last PID launched by the background job
@@ -366,32 +366,38 @@ while true; do
             echo "Remaining GPU memory is now: ${remaining_memory_mib}MiB"
 
             # Attempt to restart with increased memory
-            local memory_increment=0
-            local minimum_free_after_alloc=1024 # Minimum memory to leave free after allocation
+            memory_increment=0
+            minimum_free_after_alloc=1024 # Minimum memory to leave free after allocation
 
             # Calculate potential memory needed with a 1024 MiB increment
-            local attempt_needed_mib_1024=$((completion_memory_needed_mib + 1024))
+            attempt_needed_mib_1024=$((completion_memory_needed_mib + 1024))
             # Check if remaining memory is sufficient for this attempt PLUS the minimum free
             if [[ "$remaining_memory_mib" -ge $((attempt_needed_mib_1024 + minimum_free_after_alloc)) ]]; then
                  memory_increment=1024
                  echo "Attempting restart with +1024 MiB increment."
+            # If 1024 MiB increment + 1024 free is not possible
             else
-                 # If 1024 increment is not possible, try 512 MiB increment
-                 local attempt_needed_mib_512=$((completion_memory_needed_mib + 512))
-                 if [[ "$remaining_memory_mib" -ge $((attempt_needed_mib_512 + minimum_free_after_alloc)) ]]; then
-                      memory_increment=512
-                      echo "Attempting restart with +512 MiB increment."
-                 else
-                      # Neither increment is possible while leaving minimum free
-                      echo "ERROR: Failed to restart completions server."
-                      echo "Not enough memory for minimum increment while leaving ${minimum_free_after_alloc}MiB free."
-                      echo "Needed >= $((attempt_needed_mib_512 + minimum_free_after_alloc))MiB (base ${completion_memory_needed_mib} + 512 inc + ${minimum_free_after_alloc} free), Available ${remaining_memory_mib}MiB"
-                      echo "Current required memory target: ${completion_memory_needed_mib}MiB"
+                 echo "Not enough memory for +1024 MiB increment. Attempting to use maximum available memory."
+                 # Calculate the maximum memory we *can* allocate while leaving minimum_free_after_alloc
+                 max_possible_allocation=$((remaining_memory_mib - minimum_free_after_alloc))
 
-                      # Kill all background jobs (WireGuard monitor, other servers) and exit
-                      echo "Killing background processes and exiting."
-                      jobs -p | xargs -r kill
-                      exit 1 # Exit the script due to unrecoverable error
+                 # Check if this maximum possible allocation is larger than the current allocation
+                 if [[ "$max_possible_allocation" -gt "$completion_memory_needed_mib" ]]; then
+                     memory_increment=$((max_possible_allocation - completion_memory_needed_mib))
+                     echo "Attempting restart using ${memory_increment} MiB additional memory (total target ${max_possible_allocation} MiB)."
+                     # The rest of the script after this block will use the calculated memory_increment
+                 else
+                     # Even allocating max possible doesn't give a positive increment or leaves less than minimum_free_after_alloc
+                     echo "ERROR: Failed to restart completions server."
+                     echo "Cannot allocate more memory while leaving ${minimum_free_after_alloc}MiB free."
+                     echo "Current required memory target: ${completion_memory_needed_mib}MiB"
+                     echo "Maximum possible allocation while leaving ${minimum_free_after_alloc}MiB free: ${max_possible_allocation}MiB"
+                     echo "Available memory: ${remaining_memory_mib}MiB"
+
+                     # Kill all background jobs (WireGuard monitor, other servers) and exit
+                     echo "Killing background processes and exiting."
+                     jobs -p | xargs -r kill
+                     exit 1 # Exit the script due to unrecoverable error
                  fi
             fi
 
@@ -402,7 +408,7 @@ while true; do
             # Recalculate fraction based on TOTAL GPU memory and NEW needed memory
             # Ensure total_gpu_memory_mib is not zero to avoid division by zero
             if [[ "$total_gpu_memory_mib" -gt 0 ]]; then
-                completion_memory_fraction_float=$(awk "BEGIN{printf \"%.4f\", $completion_memory_needed_mib / $total_gpu_memory_mib}")
+                completion_memory_fraction_float=$(awk -v needed="$completion_memory_needed_mib" -v total="$total_gpu_memory_mib" 'BEGIN{printf "%.4f", needed / total}')
                 echo "Restarting vllm serve for completions on port $completions_port with fraction $completion_memory_fraction_float"
 
                 # Extract stored config details
