@@ -279,7 +279,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
                     completions_model="unsloth/DeepSeek-R1-Distill-Qwen-14B-bnb-4bit"
                     completions_task="generate"
                     # Capture the extra args needed for this specific model
-                    completions_extra_args="--tokenizer unsloth/DeepSeek-R1-Distill-Qwen-14B --load-format bitsandbytes --quantization bitsandbytes --max_model_len 25600 --max-model-len 25600 --max-num-seqs 1 --max_num_seqs 1 --max-seq-len-to-capture 1024 --enforce-eager --enable-reasoning --reasoning-parser deepseek_r1"
+                    completions_extra_args="--tokenizer unsloth/DeepSeek-R1-Distill-Qwen-14B --load-format bitsandbytes --quantization bitsandbytes --max_model_len 25600 --max-model-len 25600 --max-num-seqs 1 --max_num_seqs 1 --max-seq-len-to-capture 1024 --enforce-eager --enable-reasoning --reasoning-parser deepseek_r1 --disable-log-requests"
 
                     completion_memory_fraction_float=$(awk -v needed="$completion_memory_needed_mib" -v total="$total_gpu_memory_mib" 'BEGIN{printf "%.4f", needed / total}')
                     echo "Attempting to start vllm serve for completions on port $completions_port with fraction $completion_memory_fraction_float (${completion_memory_needed_mib}MiB)..."
@@ -314,7 +314,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
             if [[ "$remaining_memory_mib" -ge $((embedding_memory_needed_mib + 1024)) ]]; then # Check against remaining + leave 1024 free
                 embeddings_model="infly/inf-retriever-v1-1.5b"
                 embeddings_task="embed"
-                embeddings_extra_args="" # No special args needed for this model usually
+                embeddings_extra_args="--disable-log-requests"
 
                 embedding_memory_fraction_float=$(awk -v needed="$embedding_memory_needed_mib" -v total="$total_gpu_memory_mib" 'BEGIN{printf "%.4f", needed / total}')
                 echo "Attempting to start vllm serve for embeddings on port $embeddings_port with fraction $embedding_memory_fraction_float (${embedding_memory_needed_mib}MiB)..."
