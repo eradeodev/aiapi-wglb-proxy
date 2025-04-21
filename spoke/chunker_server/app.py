@@ -47,7 +47,7 @@ def get_tokenizer(tokenizer_name_or_path):
                 tokenizer_cache[tokenizer_name_or_path] = tokenizer
                 return tokenizer
             except Exception as ignored:
-                logging.error(f"{RED}could not load as tiktoken tokenizer name: {ignored}{RESET}")
+                logging.info(f"{RED}could not load as tiktoken tokenizer name: {ignored} -- trying AutoTokenizer next...{RESET}")
                 first_exception = ignored
             
             try:
