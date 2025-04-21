@@ -9,7 +9,7 @@ import traceback
 import uuid
 
 
-# @Work @EX TODO support passing token indicating request should be served via runpod
+# @Work @EX "RunPod Chat Completion/Embeddings Request Support" TODO support passing token indicating request should be served via runpod
 _GENERATE_PATHS = {"/api/chunk", "/v1/embeddings", "/v1/chat/completions"}
 _PROXY_TIMEOUT = (60, 3600)  # (connect timeout, read timeout)
 _MAX_RETRIES = 3
