@@ -296,6 +296,10 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
                     echo "Completions server started with PID $completions_pid. Remaining GPU memory: ${remaining_memory_mib}MiB"
                 else
                     echo "Not enough GPU memory to start completions server with initial allocation (${completion_memory_needed_mib}MiB needed + 1024MiB free required, ${remaining_memory_mib}MiB available)."
+                    # Kill all background jobs (WireGuard monitor, other servers) and exit
+                    echo "Killing background processes and exiting."
+                    jobs -p | xargs -r kill
+                    exit 1 # Exit the script due to unrecoverable error
                 fi
             else
                 echo "GPU not detected or total memory is 0. Skipping completions server startup."
