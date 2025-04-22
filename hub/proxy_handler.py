@@ -256,7 +256,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         current_post_data = post_data # Keep track of potentially modified post data
 
         # Log initial attempt (if applicable) and prepare request
-        ASCIIColors.yellow(f"is_generate_path == {is_generate_path} ; load_tracker == {load_tracker} ; queue_size == {queue_size}")
         if is_generate_path and load_tracker:
             # Log the *actual* post data being sent (potentially updated)
             load_tracker.put_nowait(1)
