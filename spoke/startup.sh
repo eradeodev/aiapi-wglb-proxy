@@ -371,7 +371,7 @@ while true; do
 
             # Attempt to restart with increased memory
             memory_increment=0
-            minimum_free_after_alloc=512 # Minimum memory to leave free after allocation
+            minimum_free_after_alloc=256 # Minimum memory to leave free after allocation
 
             # Calculate potential memory needed with a 1024 MiB increment
             attempt_needed_mib_1024=$((completion_memory_needed_mib + 1024))
