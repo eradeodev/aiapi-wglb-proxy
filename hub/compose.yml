@@ -16,7 +16,11 @@ services:
     environment:
       - HUB_PRIV_KEY=${HUB_PRIV_KEY}
       - DEFAULT_PEER_PUB_KEY=${DEFAULT_PEER_PUB_KEY}
-
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
 volumes:
   peers:
   logs:
