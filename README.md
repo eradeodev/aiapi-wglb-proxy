@@ -48,4 +48,4 @@ HUB_PUB_KEY: The public key generated for the Hub
 DEFAULT_PEER_PRIV_KEY: The private key generated for the Default Peer
 ```
 
-Run each container with `docker-compose up`
+Run each container with `docker compose up`
