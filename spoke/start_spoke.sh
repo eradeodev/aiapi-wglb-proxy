@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export UUID_SERVER_NAME=$(edmulti -s)
+export UUID_SERVER_NAME=$(edmulti -s || cat /etc/machine-id)
 
 docker compose down
 if [ $# -gt 0 ]; then
