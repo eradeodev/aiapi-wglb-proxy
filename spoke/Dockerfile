@@ -19,6 +19,8 @@ RUN mkdir -p $MINICONDA_PATH && \
     bash $MINICONDA_PATH/miniconda.sh -b -u -p $MINICONDA_PATH && \
     rm $MINICONDA_PATH/miniconda.sh
 
+RUN /root/miniconda3/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && /root/miniconda3/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+
 # Create conda env
 RUN /root/miniconda3/bin/conda create -n py312 python=3.12 -y
 
