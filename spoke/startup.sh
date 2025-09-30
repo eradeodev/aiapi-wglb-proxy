@@ -263,7 +263,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
 
     # Default initial memory needed for completions (this will dynamically increase on restarts)
     # This value is the STARTING point, the actual allocated memory is tracked in completion_memory_needed_mib
-    initial_completion_memory_mib=8192
+    initial_completion_memory_mib=8704
 
     # === Prioritize and attempt to start /v1/chat/completions ===
     for endpoint_config in "${enabled_endpoints[@]}"; do
