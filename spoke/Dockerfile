@@ -1,4 +1,4 @@
-FROM vllm/vllm-openai
+FROM vllm/vllm-openai:v0.10.2
 
 ENV TZ=America/Los_Angeles
 ENV DEBIAN_FRONTEND=noninteractive

@@ -49,3 +49,7 @@ DEFAULT_PEER_PRIV_KEY: The private key generated for the Default Peer
 ```
 
 Run each container with `docker compose up`
+
+
+# Applying Changes Made to `.env` After Initial Run
+Simply run `start_spoke.sh` with any argument passed to delete the `configs` volume, forcing the spoke to resend its config to the hub.  

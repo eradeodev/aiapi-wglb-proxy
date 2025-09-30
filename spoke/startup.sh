@@ -227,7 +227,7 @@ start_vllm_server_bg() {
     fi
 
     # Start vllm serve in the background
-    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True vllm serve "$model" --task "$task" --host 0.0.0.0 --port "$port" --gpu-memory-utilization "$memory_fraction" $current_extra_args &
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True vllm serve $model --task "$task" --host 0.0.0.0 --port "$port" --gpu-memory-utilization "$memory_fraction" $current_extra_args &
     # The PID is captured by the caller using $!
 }
 
@@ -263,7 +263,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
 
     # Default initial memory needed for completions (this will dynamically increase on restarts)
     # This value is the STARTING point, the actual allocated memory is tracked in completion_memory_needed_mib
-    initial_completion_memory_mib=15351
+    initial_completion_memory_mib=7680
 
     # === Prioritize and attempt to start /v1/chat/completions ===
     for endpoint_config in "${enabled_endpoints[@]}"; do
@@ -274,12 +274,12 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
             if [[ "$total_gpu_memory_mib" -gt 0 ]]; then
                 # Set the initial memory needed for this attempt
                 completion_memory_needed_mib="$initial_completion_memory_mib"
-                # Check if enough memory is available for the initial allocation + 1024MiB free
-                if [[ "$remaining_memory_mib" -ge $((completion_memory_needed_mib + 1024)) ]]; then
-                    completions_model="unsloth/DeepSeek-R1-Distill-Qwen-14B-bnb-4bit"
+                # Check if enough memory is available for the initial allocation + 512MiB free
+                if [[ "$remaining_memory_mib" -ge $((completion_memory_needed_mib + 512)) ]]; then
+                    completions_model="unsloth/Qwen3-4B-Thinking-2507-unsloth-bnb-4bit"
                     completions_task="generate"
                     # Capture the extra args needed for this specific model
-                    completions_extra_args="--tokenizer unsloth/DeepSeek-R1-Distill-Qwen-14B --load-format bitsandbytes --quantization bitsandbytes --max_model_len 25600 --max-model-len 25600 --max-num-seqs 1 --max_num_seqs 1 --max-seq-len-to-capture 1024 --enforce-eager --enable-reasoning --reasoning-parser deepseek_r1 --disable-log-requests"
+                    completions_extra_args="--tokenizer unsloth/Qwen3-4B-Thinking-2507 --load-format bitsandbytes --quantization bitsandbytes --max_model_len 25600 --max-model-len 25600 --max-num-seqs 1 --max_num_seqs 1 --max-seq-len-to-capture 1024 --enforce-eager --reasoning-parser qwen3 --disable-log-requests"
 
                     completion_memory_fraction_float=$(awk -v needed="$completion_memory_needed_mib" -v total="$total_gpu_memory_mib" 'BEGIN{printf "%.4f", needed / total}')
                     echo "Attempting to start vllm serve for completions on port $completions_port with fraction $completion_memory_fraction_float (${completion_memory_needed_mib}MiB)..."
@@ -295,7 +295,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
                     remaining_memory_mib=$((remaining_memory_mib - completion_memory_needed_mib))
                     echo "Completions server started with PID $completions_pid. Remaining GPU memory: ${remaining_memory_mib}MiB"
                 else
-                    echo "Not enough GPU memory to start completions server with initial allocation (${completion_memory_needed_mib}MiB needed + 1024MiB free required, ${remaining_memory_mib}MiB available)."
+                    echo "Not enough GPU memory to start completions server with initial allocation (${completion_memory_needed_mib}MiB needed + 512MiB free required, ${remaining_memory_mib}MiB available)."
                     # Kill all background jobs (WireGuard monitor, other servers) and exit
                     echo "Killing background processes and exiting."
                     jobs -p | xargs -r kill
@@ -313,17 +313,18 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
         if [[ "$endpoint_config" == *"/v1/embeddings"* ]]; then
             embeddings_port=$(echo "$endpoint_config" | cut -d':' -f2 | cut -d'/' -f1)
             echo "Configuration found for embeddings server on port $embeddings_port."
+            #[ -f /app/models/Qwen3-Embedding-0.6B-Q8_0.gguf ] || wget -O /app/models/Qwen3-Embedding-0.6B-Q8_0.gguf https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf
 
-            embedding_memory_needed_mib=3072 # Fixed allocation for embeddings
-            if [[ "$remaining_memory_mib" -ge $((embedding_memory_needed_mib + 1024)) ]]; then # Check against remaining + leave 1024 free
-                embeddings_model="infly/inf-retriever-v1-1.5b"
+            embedding_memory_needed_mib=4608 # Fixed allocation for embeddings
+            if [[ "$remaining_memory_mib" -ge $((embedding_memory_needed_mib + 512)) ]]; then # Check against remaining + leave 512 free
+                embeddings_model="AXERA-TECH/Qwen3-Embedding-0.6B-GPTQ-Int8"
                 embeddings_task="embed"
-                embeddings_extra_args="--disable-log-requests"
+                embeddings_extra_args="--max_model_len 32768 --max-model-len 32768 --max-num-seqs 1 --max_num_seqs 1 --max-seq-len-to-capture 1024 --enforce-eager --disable-log-requests"
 
                 embedding_memory_fraction_float=$(awk -v needed="$embedding_memory_needed_mib" -v total="$total_gpu_memory_mib" 'BEGIN{printf "%.4f", needed / total}')
                 echo "Attempting to start vllm serve for embeddings on port $embeddings_port with fraction $embedding_memory_fraction_float (${embedding_memory_needed_mib}MiB)..."
 
-                start_vllm_server_bg "$embeddings_model" "$embeddings_task" "$embeddings_port" "$embedding_memory_fraction_float" "$embeddings_extra_args"
+                start_vllm_server_bg $embeddings_model "$embeddings_task" "$embeddings_port" "$embedding_memory_fraction_float" "$embeddings_extra_args"
                 server_pids["embeddings"]=$!
                 server_ports["embeddings"]="$embeddings_port"
                 server_configs["embeddings"]="${embeddings_model}|${embeddings_task}|${embeddings_extra_args}" # Store config
@@ -331,7 +332,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
                 remaining_memory_mib=$((remaining_memory_mib - embedding_memory_needed_mib))
                 echo "Embeddings server started with PID ${server_pids["embeddings"]}. Remaining GPU memory: ${remaining_memory_mib}MiB"
             else
-                echo "Not enough remaining GPU memory to start embeddings server (${embedding_memory_needed_mib}MiB needed + 1024MiB free required, ${remaining_memory_mib}MiB available)."
+                echo "Not enough remaining GPU memory to start embeddings server (${embedding_memory_needed_mib}MiB needed + 512MiB free required, ${remaining_memory_mib}MiB available)."
             fi
             break # Start only one embeddings server config
         fi
@@ -373,15 +374,15 @@ while true; do
             memory_increment=0
             minimum_free_after_alloc=256 # Minimum memory to leave free after allocation
 
-            # Calculate potential memory needed with a 1024 MiB increment
-            attempt_needed_mib_1024=$((completion_memory_needed_mib + 1024))
+            # Calculate potential memory needed with a 512 MiB increment
+            attempt_needed_mib_512=$((completion_memory_needed_mib + 512))
             # Check if remaining memory is sufficient for this attempt PLUS the minimum free
-            if [[ "$remaining_memory_mib" -ge $((attempt_needed_mib_1024 + minimum_free_after_alloc)) ]]; then
-                 memory_increment=1024
-                 echo "Attempting restart with +1024 MiB increment."
-            # If 1024 MiB increment + 1024 free is not possible
+            if [[ "$remaining_memory_mib" -ge $((attempt_needed_mib_512 + minimum_free_after_alloc)) ]]; then
+                 memory_increment=512
+                 echo "Attempting restart with +512 MiB increment."
+            # If 512 MiB increment + 512 free is not possible
             else
-                 echo "Not enough memory for +1024 MiB increment. Attempting to use maximum available memory."
+                 echo "Not enough memory for +512 MiB increment. Attempting to use maximum available memory."
                  # Calculate the maximum memory we *can* allocate while leaving minimum_free_after_alloc
                  max_possible_allocation=$((remaining_memory_mib - minimum_free_after_alloc))
 
