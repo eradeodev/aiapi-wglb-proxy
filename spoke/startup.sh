@@ -263,7 +263,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
 
     # Default initial memory needed for completions (this will dynamically increase on restarts)
     # This value is the STARTING point, the actual allocated memory is tracked in completion_memory_needed_mib
-    initial_completion_memory_mib=7680
+    initial_completion_memory_mib=8192
 
     # === Prioritize and attempt to start /v1/chat/completions ===
     for endpoint_config in "${enabled_endpoints[@]}"; do
@@ -279,7 +279,7 @@ if [[ -n "$ENABLED_FOR_REQUESTS" ]]; then
                     completions_model="unsloth/Qwen3-4B-Thinking-2507-unsloth-bnb-4bit"
                     completions_task="generate"
                     # Capture the extra args needed for this specific model
-                    completions_extra_args="--tokenizer unsloth/Qwen3-4B-Thinking-2507 --load-format bitsandbytes --quantization bitsandbytes --max_model_len 25600 --max-model-len 25600 --max-num-seqs 1 --max_num_seqs 1 --max-seq-len-to-capture 1024 --enforce-eager --reasoning-parser qwen3 --disable-log-requests"
+                    completions_extra_args="--tokenizer unsloth/Qwen3-4B-Thinking-2507 --load-format bitsandbytes --quantization bitsandbytes --max_model_len 32768 --max-model-len 32768 --max-num-seqs 1 --max_num_seqs 1 --max-seq-len-to-capture 1024 --enforce-eager --reasoning-parser qwen3 --disable-log-requests"
 
                     completion_memory_fraction_float=$(awk -v needed="$completion_memory_needed_mib" -v total="$total_gpu_memory_mib" 'BEGIN{printf "%.4f", needed / total}')
                     echo "Attempting to start vllm serve for completions on port $completions_port with fraction $completion_memory_fraction_float (${completion_memory_needed_mib}MiB)..."
